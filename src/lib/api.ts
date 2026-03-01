@@ -39,6 +39,7 @@ export interface SubmissionItem {
 
 export interface AdminConfig {
   admin_hash?: string;
+  admin_wallet?: string;
 }
 
 export async function fetchFiles(): Promise<string[]> {

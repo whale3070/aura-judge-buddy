@@ -15,6 +15,7 @@ export default function Admin() {
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [adminHash, setAdminHash] = useState<string | null>(null);
+  const [adminWallet, setAdminWallet] = useState<string>("");
   const [configLoading, setConfigLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("score");
@@ -26,14 +27,16 @@ export default function Admin() {
     fetchAdminConfig()
       .then((cfg) => {
         setAdminHash(cfg.admin_hash ?? "");
+        setAdminWallet((cfg.admin_wallet ?? "").toLowerCase());
       })
       .finally(() => setConfigLoading(false));
   }, []);
 
   const hashOk = adminHash ? hash === adminHash : true;
+  const isAdmin = !!wallet.address && !!adminWallet && wallet.address.toLowerCase() === adminWallet;
 
   useEffect(() => {
-    if (!hashOk || !wallet.isAdmin || !wallet.address) {
+    if (!hashOk || !isAdmin || !wallet.address) {
       setDataLoading(false);
       return;
     }
@@ -44,7 +47,7 @@ export default function Admin() {
         setSubmissions(s);
       })
       .finally(() => setDataLoading(false));
-  }, [hashOk, wallet.isAdmin, wallet.address]);
+  }, [hashOk, isAdmin, wallet.address]);
 
   const filtered = useMemo(() => {
     let items = [...rankings];
@@ -89,7 +92,7 @@ export default function Admin() {
     );
   }
 
-  if (!wallet.isAdmin) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-5">
         <div className="w-full max-w-md border border-primary/40 p-8 bg-card shadow-[0_0_30px_hsl(var(--primary)/0.1)]">
