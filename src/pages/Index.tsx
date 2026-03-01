@@ -172,12 +172,18 @@ export default function Index() {
           PREDICTIVE AUDIT ENGINE // 2026 VER. // MULTI-AGENT HACKATHON JUDGE
         </p>
 
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center gap-3 mb-6">
           <Link
             to="/submit"
             className="text-xs border border-primary/40 px-4 py-2 text-primary hover:bg-primary/10 hover:shadow-[0_0_12px_hsl(var(--primary)/0.3)] transition-all"
           >
             📋 项目提交入口 (PROJECT SUBMISSION) →
+          </Link>
+          <Link
+            to="/admin"
+            className="text-xs border border-secondary/40 px-4 py-2 text-secondary hover:bg-secondary/10 hover:shadow-[0_0_12px_hsl(var(--secondary)/0.3)] transition-all"
+          >
+            🛡️ 管理后台 (ADMIN) →
           </Link>
         </div>
 

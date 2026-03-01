@@ -19,6 +19,24 @@ export interface RankingItem {
   timestamp: string;
 }
 
+export interface JudgeResult {
+  file_name: string;
+  avg_score: number;
+  timestamp: string;
+  reports: AuditReport[];
+}
+
+export interface SubmissionItem {
+  id: string;
+  created_at: string;
+  project_title: string;
+  one_liner: string;
+  github_url: string;
+  demo_url: string;
+  why_this_chain: string;
+  md_files: string[];
+}
+
 export async function fetchFiles(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/api/files`);
   if (!res.ok) throw new Error("无法获取文件列表");
@@ -49,18 +67,17 @@ export async function fetchRankings(): Promise<RankingItem[]> {
   return res.json();
 }
 
-export interface JudgeResult {
-  file_name: string;
-  avg_score: number;
-  timestamp: string;
-  reports: AuditReport[];
-}
-
 export async function fetchJudgeResult(fileName: string): Promise<JudgeResult> {
   const res = await fetch(`${API_BASE}/api/judge-result?file=${encodeURIComponent(fileName)}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "请求失败" }));
     throw new Error(err.error || "请求失败");
   }
+  return res.json();
+}
+
+export async function fetchSubmissions(): Promise<SubmissionItem[]> {
+  const res = await fetch(`${API_BASE}/api/submissions`);
+  if (!res.ok) return [];
   return res.json();
 }
