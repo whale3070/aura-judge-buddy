@@ -3,7 +3,7 @@ const TARGET_API_URL = "http://198.55.109.102:8888";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-admin-wallet, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -26,10 +26,16 @@ Deno.serve(async (req) => {
 
     const backendUrl = `${TARGET_API_URL}${endpoint}${url.search}`;
 
-    // Forward the request, preserving method and body
+    // Forward the request, preserving method, body, and admin auth header
+    const forwardHeaders: Record<string, string> = {
+      "Content-Type": req.headers.get("content-type") || "application/json",
+    };
+    const adminWallet = req.headers.get("x-admin-wallet");
+    if (adminWallet) forwardHeaders["X-Admin-Wallet"] = adminWallet;
+
     const fetchOptions: RequestInit = {
       method: req.method,
-      headers: { "Content-Type": req.headers.get("content-type") || "application/json" },
+      headers: forwardHeaders,
     };
 
     // For multipart (file uploads), forward the raw body and content-type

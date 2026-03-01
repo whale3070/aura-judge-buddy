@@ -88,7 +88,10 @@ export async function fetchSubmissions(adminWallet?: string): Promise<Submission
       "X-Admin-Wallet": adminWallet,
     },
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    if (res.status === 401) console.warn("[Admin] 提交列表 401：请确认代理已转发 X-Admin-Wallet 请求头");
+    return [];
+  }
   return res.json();
 }
 
