@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { fetchFiles, submitAudit, fetchRankings, type AuditReport, type RankingItem } from "@/lib/api";
+import JudgeDetail from "@/components/JudgeDetail";
 import { JUDGE_PROMPT } from "@/lib/prompts";
 import RankingTable from "@/components/RankingTable";
 import FileSelector from "@/components/FileSelector";
@@ -34,6 +35,7 @@ export default function Index() {
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [rankingsLoading, setRankingsLoading] = useState(true);
   const [reports, setReports] = useState<ReportEntry[]>([]);
+  const [selectedRankingFile, setSelectedRankingFile] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const batchStopRef = useRef(false);
@@ -179,7 +181,19 @@ export default function Index() {
           </Link>
         </div>
 
-        <RankingTable rankings={rankings} loading={rankingsLoading} />
+        <RankingTable
+          rankings={rankings}
+          loading={rankingsLoading}
+          selectedFile={selectedRankingFile ?? undefined}
+          onSelect={(f) => setSelectedRankingFile(f === selectedRankingFile ? null : f)}
+        />
+
+        {selectedRankingFile && (
+          <JudgeDetail
+            fileName={selectedRankingFile}
+            onClose={() => setSelectedRankingFile(null)}
+          />
+        )}
 
         <FileSelector files={files} selected={selectedFile} onChange={setSelectedFile} loading={filesLoading} />
         <PromptEditor value={prompt} onChange={setPrompt} />
