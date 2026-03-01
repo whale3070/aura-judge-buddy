@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { fetchRankings, fetchSubmissions, type RankingItem, type SubmissionItem } from "@/lib/api";
+import { fetchRankings, fetchSubmissions, fetchAdminConfig, type RankingItem, type SubmissionItem } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import { useWallet } from "@/hooks/useWallet";
 
@@ -14,14 +14,23 @@ export default function Admin() {
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [adminHash, setAdminHash] = useState<string | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [tab, setTab] = useState<"rankings" | "submissions">("rankings");
 
-  const ADMIN_HASH = import.meta.env.VITE_ADMIN_HASH || "";
-  const hashOk = ADMIN_HASH ? hash === ADMIN_HASH : true;
+  useEffect(() => {
+    fetchAdminConfig()
+      .then((cfg) => {
+        setAdminHash(cfg.admin_hash ?? "");
+      })
+      .finally(() => setConfigLoading(false));
+  }, []);
+
+  const hashOk = adminHash ? hash === adminHash : true;
 
   useEffect(() => {
     if (!hashOk || !wallet.isAdmin || !wallet.address) {
@@ -63,6 +72,14 @@ export default function Admin() {
   // Find submission for a given ranking file
   const findSubmission = (fileName: string) =>
     submissions.find((s) => s.md_files?.includes(fileName));
+
+  if (configLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
+        LOADING...
+      </div>
+    );
+  }
 
   if (!hashOk) {
     return (

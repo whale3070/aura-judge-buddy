@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { fetchFiles, submitAudit, fetchRankings, type AuditReport, type RankingItem } from "@/lib/api";
+import { fetchFiles, submitAudit, fetchRankings, fetchAdminConfig, type AuditReport, type RankingItem } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import { JUDGE_PROMPT } from "@/lib/prompts";
 import RankingTable from "@/components/RankingTable";
@@ -42,6 +42,7 @@ export default function Index() {
   const [concurrency, setConcurrency] = useState(1);
   const [delayMs, setDelayMs] = useState(200);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [adminHash, setAdminHash] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -59,6 +60,12 @@ export default function Index() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    fetchAdminConfig()
+      .then((cfg) => setAdminHash(cfg.admin_hash ?? ""))
+      .catch(() => setAdminHash(""));
+  }, []);
 
   const addReport = (entry: ReportEntry) => {
     setReports((prev) => [entry, ...prev]);
@@ -181,9 +188,11 @@ export default function Index() {
           </Link>
           <Link
             to={
-              import.meta.env.VITE_ADMIN_HASH
-                ? `/admin/${import.meta.env.VITE_ADMIN_HASH}`
-                : "/admin/NO_ADMIN_HASH"
+              adminHash === null
+                ? "/admin/LOADING"
+                : adminHash
+                  ? `/admin/${adminHash}`
+                  : "/admin/NO_ADMIN_HASH"
             }
             className="text-xs border border-secondary/40 px-4 py-2 text-secondary hover:bg-secondary/10 hover:shadow-[0_0_12px_hsl(var(--secondary)/0.3)] transition-all"
           >

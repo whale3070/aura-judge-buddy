@@ -37,6 +37,10 @@ export interface SubmissionItem {
   md_files: string[];
 }
 
+export interface AdminConfig {
+  admin_hash?: string;
+}
+
 export async function fetchFiles(): Promise<string[]> {
   const res = await fetch(`${API_BASE}/api/files`);
   if (!res.ok) throw new Error("无法获取文件列表");
@@ -85,4 +89,14 @@ export async function fetchSubmissions(adminWallet?: string): Promise<Submission
   });
   if (!res.ok) return [];
   return res.json();
+}
+
+export async function fetchAdminConfig(): Promise<AdminConfig> {
+  try {
+    const res = await fetch(`${API_BASE}/api/admin-config`);
+    if (!res.ok) return {};
+    return res.json();
+  } catch {
+    return {};
+  }
 }
