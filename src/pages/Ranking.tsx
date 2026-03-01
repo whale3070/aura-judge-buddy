@@ -2,12 +2,10 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { fetchRankings, type RankingItem } from "@/lib/api";
 import RankingTable from "@/components/RankingTable";
-import JudgeDetail from "@/components/JudgeDetail";
 
 export default function Ranking() {
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRankings()
@@ -26,18 +24,13 @@ export default function Ranking() {
             裁决系统
           </Link>
         </div>
-        <h1 className="text-center text-2xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)] mb-4">
-          📊 项目排名 (API /api/ranking)
+        <h1 className="text-center text-2xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)] mb-2">
+          📊 项目排名
         </h1>
-        <RankingTable
-          rankings={rankings}
-          loading={loading}
-          selectedFile={selectedFile ?? undefined}
-          onSelect={(f) => setSelectedFile(f === selectedFile ? null : f)}
-        />
-        {selectedFile && (
-          <JudgeDetail fileName={selectedFile} onClose={() => setSelectedFile(null)} />
-        )}
+        <p className="text-center text-xs text-muted-foreground mb-4">
+          仅可查看排名列表；查看自己项目的 AI 评分与详情请使用提交成功后收到的「我的项目」链接。
+        </p>
+        <RankingTable rankings={rankings} loading={loading} />
       </div>
     </div>
   );

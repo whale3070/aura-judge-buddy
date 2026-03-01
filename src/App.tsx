@@ -2,16 +2,24 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useSearchParams } from "react-router-dom";
 import Index from "./pages/Index";
 import Submit from "./pages/Submit";
 import Admin from "./pages/Admin";
 import Ranking from "./pages/Ranking";
+import Landing from "./pages/Landing";
+import MySubmission from "./pages/MySubmission";
 import NotFound from "./pages/NotFound";
 
 function AdminHashRedirect() {
   const { hash } = useParams<{ hash: string }>();
   return <Navigate to={hash ? `/?h=${encodeURIComponent(hash)}` : "/"} replace />;
+}
+
+function RootRoute() {
+  const [searchParams] = useSearchParams();
+  const h = searchParams.get("h");
+  return h ? <Admin /> : <Landing />;
 }
 
 const queryClient = new QueryClient();
@@ -23,9 +31,10 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Admin />} />
+          <Route path="/" element={<RootRoute />} />
           <Route path="/submit" element={<Submit />} />
           <Route path="/ranking" element={<Ranking />} />
+          <Route path="/my-submission/:id" element={<MySubmission />} />
           <Route path="/judge" element={<Index />} />
           <Route path="/admin/:hash" element={<AdminHashRedirect />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

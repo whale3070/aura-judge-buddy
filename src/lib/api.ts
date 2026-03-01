@@ -81,6 +81,16 @@ export async function fetchJudgeResult(fileName: string): Promise<JudgeResult> {
   return res.json();
 }
 
+export async function fetchSubmissionById(id: string): Promise<SubmissionItem | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/submission/${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchSubmissions(adminWallet?: string): Promise<SubmissionItem[]> {
   if (!adminWallet) return [];
   const res = await fetch(`${API_BASE}/api/submissions`, {

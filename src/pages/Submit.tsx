@@ -30,6 +30,7 @@ export default function Submit() {
   const [form, setForm] = useState<SubmissionForm>(EMPTY_FORM);
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [lastSubmissionId, setLastSubmissionId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const set = (field: keyof SubmissionForm) => (
@@ -82,16 +83,18 @@ export default function Submit() {
     files.forEach((f) => fd.append("files", f));
 
     try {
-      // POST to backend /api/submit
       const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
       const res = await fetch(`https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy/api/submit`, {
         method: "POST",
         body: fd,
       });
       if (!res.ok) throw new Error("提交失败");
-      toast.success("🎉 项目提交成功！");
+      const data = await res.json().catch(() => ({}));
+      const submissionId = data?.id;
       setForm(EMPTY_FORM);
       setFiles([]);
+      setLastSubmissionId(submissionId ?? null);
+      toast.success("🎉 项目提交成功！");
     } catch {
       toast.error("提交失败，请检查网络或稍后重试");
     }
@@ -123,6 +126,18 @@ export default function Submit() {
             </Link>
           </div>
         </div>
+
+        {lastSubmissionId && (
+          <div className="mb-6 p-4 bg-primary/10 border border-primary/40 rounded">
+            <p className="text-sm text-foreground/90 mb-2">✅ 提交成功！你可通过下方链接查看该项目的 AI 评分与排名（仅你自己可见）。</p>
+            <Link
+              to={`/my-submission/${lastSubmissionId}`}
+              className="inline-flex items-center text-sm font-bold text-primary hover:underline"
+            >
+              查看我的项目评分与排名 →
+            </Link>
+          </div>
+        )}
 
         <h1 className="text-center text-3xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)] animate-flicker mb-1">
           📋 PROJECT SUBMISSION
