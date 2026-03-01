@@ -3,9 +3,11 @@ import type { RankingItem } from "@/lib/api";
 interface Props {
   rankings: RankingItem[];
   loading: boolean;
+  selectedFile?: string;
+  onSelect?: (fileName: string) => void;
 }
 
-export default function RankingTable({ rankings, loading }: Props) {
+export default function RankingTable({ rankings, loading, selectedFile, onSelect }: Props) {
   const scoreClass = (score: number) => {
     if (score >= 80) return "text-primary font-bold drop-shadow-[0_0_5px_hsl(var(--primary)/0.8)]";
     if (score < 60) return "text-destructive font-bold";
@@ -37,7 +39,15 @@ export default function RankingTable({ rankings, loading }: Props) {
               <tr><td colSpan={4} className="p-3 text-center text-muted-foreground">VOID_DATA</td></tr>
             ) : (
               rankings.map((item, i) => (
-                <tr key={item.file_name} className="border-b border-secondary/10 hover:bg-secondary/[0.05] transition-colors">
+                <tr
+                  key={item.file_name}
+                  onClick={() => onSelect?.(item.file_name)}
+                  className={`border-b border-secondary/10 transition-colors cursor-pointer ${
+                    selectedFile === item.file_name
+                      ? "bg-secondary/[0.12] border-l-2 border-l-secondary"
+                      : "hover:bg-secondary/[0.05]"
+                  }`}
+                >
                   <td className="p-3 text-muted-foreground">{i + 1}</td>
                   <td className="p-3 text-foreground/90">{item.file_name}</td>
                   <td className={`p-3 ${scoreClass(item.avg_score)}`}>{item.avg_score.toFixed(1)}%</td>
