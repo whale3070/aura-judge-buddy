@@ -67,6 +67,11 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Space Grotesk', sans-serif;
   }
+
+  .field-input {
+    @apply w-full bg-muted border border-border text-foreground p-3 font-mono text-sm outline-none transition-all;
+    @apply focus:border-primary focus:shadow-[var(--matrix-glow)];
+  }
 }
 
 /* Animations */
