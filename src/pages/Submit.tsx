@@ -83,7 +83,8 @@ export default function Submit() {
 
     try {
       // POST to backend /api/submit
-      const res = await fetch("http://198.55.109.102:8888/api/submit", {
+      const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
+      const res = await fetch(`https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy/api/submit`, {
         method: "POST",
         body: fd,
       });
