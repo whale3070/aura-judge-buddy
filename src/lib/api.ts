@@ -1,4 +1,5 @@
-const API_BASE = "http://198.55.109.102:8888";
+const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
+const API_BASE = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy`;
 
 export interface AuditReport {
   model_name: string;
