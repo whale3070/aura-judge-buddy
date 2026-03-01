@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 import type { AuditReport } from "@/lib/api";
 
 interface Props {
@@ -56,11 +57,11 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
                     </span>
                   )}
                 </div>
-                <div className="p-3.5 bg-background border border-border border-t-0 overflow-x-auto text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                <div className="p-3.5 bg-background border border-border border-t-0 overflow-x-auto text-sm text-foreground/80 leading-relaxed prose prose-sm prose-invert max-w-none prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground/80">
                   {report.error ? (
                     <span className="text-destructive">ERROR: {report.error}</span>
                   ) : (
-                    report.content
+                    <ReactMarkdown>{report.content}</ReactMarkdown>
                   )}
                 </div>
               </div>
