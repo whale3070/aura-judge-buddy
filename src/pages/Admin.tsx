@@ -1,15 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { fetchRankings, fetchSubmissions, type RankingItem, type SubmissionItem } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
+import { useWallet } from "@/hooks/useWallet";
 
 type SortKey = "rank" | "score" | "time" | "name";
 type SortDir = "asc" | "desc";
 
 export default function Admin() {
-  const { user, isAdmin, loading, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { hash } = useParams<{ hash?: string }>();
+  const wallet = useWallet();
 
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
@@ -20,17 +20,22 @@ export default function Admin() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [tab, setTab] = useState<"rankings" | "submissions">("rankings");
 
-  useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
-      navigate("/login");
-    }
-  }, [loading, user, isAdmin, navigate]);
+  const ADMIN_HASH = import.meta.env.VITE_ADMIN_HASH || "";
+  const hashOk = ADMIN_HASH ? hash === ADMIN_HASH : true;
 
   useEffect(() => {
-    Promise.all([fetchRankings(), fetchSubmissions()])
-      .then(([r, s]) => { setRankings(r); setSubmissions(s); })
+    if (!hashOk || !wallet.isAdmin || !wallet.address) {
+      setDataLoading(false);
+      return;
+    }
+    setDataLoading(true);
+    Promise.all([fetchRankings(), fetchSubmissions(wallet.address)])
+      .then(([r, s]) => {
+        setRankings(r);
+        setSubmissions(s);
+      })
       .finally(() => setDataLoading(false));
-  }, []);
+  }, [hashOk, wallet.isAdmin, wallet.address]);
 
   const filtered = useMemo(() => {
     let items = [...rankings];
@@ -59,7 +64,45 @@ export default function Admin() {
   const findSubmission = (fileName: string) =>
     submissions.find((s) => s.md_files?.includes(fileName));
 
-  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">LOADING...</div>;
+  if (!hashOk) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
+        INVALID ADMIN LINK
+      </div>
+    );
+  }
+
+  if (!wallet.isAdmin) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-5">
+        <div className="w-full max-w-md border border-primary/40 p-8 bg-card shadow-[0_0_30px_hsl(var(--primary)/0.1)]">
+          <h1 className="text-center text-2xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)] mb-4">
+            🛡️ ADMIN ACCESS
+          </h1>
+          <p className="text-xs text-muted-foreground mb-4">
+            仅允许绑定的钱包地址访问管理后台。请连接管理员钱包：
+          </p>
+          <button
+            onClick={wallet.connect}
+            disabled={wallet.connecting}
+            className="w-full bg-primary text-primary-foreground font-bold py-3 text-sm tracking-wider hover:shadow-[0_0_20px_hsl(var(--primary)/0.6)] transition-all disabled:opacity-50"
+          >
+            {wallet.connecting ? "CONNECTING..." : "连接钱包 (CONNECT WALLET)"}
+          </button>
+          {wallet.address && (
+            <div className="mt-3 text-xs text-muted-foreground break-all">
+              当前地址：<span className="font-mono">{wallet.address}</span>
+            </div>
+          )}
+          {wallet.error && (
+            <div className="mt-2 text-xs text-destructive">
+              {wallet.error}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-5">
@@ -70,10 +113,11 @@ export default function Admin() {
             🛡️ ADMIN CONSOLE
           </h1>
           <div className="flex gap-3 items-center">
-            <span className="text-xs text-muted-foreground">{user?.email}</span>
-            <button onClick={signOut} className="text-xs border border-destructive/40 px-3 py-1 text-destructive hover:bg-destructive/10 transition-colors">
-              LOGOUT
-            </button>
+            {wallet.address && (
+              <span className="text-xs text-muted-foreground font-mono">
+                {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
+              </span>
+            )}
           </div>
         </div>
 

@@ -180,7 +180,11 @@ export default function Index() {
             📋 项目提交入口 (PROJECT SUBMISSION) →
           </Link>
           <Link
-            to="/admin"
+            to={
+              import.meta.env.VITE_ADMIN_HASH
+                ? `/admin/${import.meta.env.VITE_ADMIN_HASH}`
+                : "/admin/NO_ADMIN_HASH"
+            }
             className="text-xs border border-secondary/40 px-4 py-2 text-secondary hover:bg-secondary/10 hover:shadow-[0_0_12px_hsl(var(--secondary)/0.3)] transition-all"
           >
             🛡️ 管理后台 (ADMIN) →

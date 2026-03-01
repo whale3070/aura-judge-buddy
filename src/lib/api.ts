@@ -76,8 +76,13 @@ export async function fetchJudgeResult(fileName: string): Promise<JudgeResult> {
   return res.json();
 }
 
-export async function fetchSubmissions(): Promise<SubmissionItem[]> {
-  const res = await fetch(`${API_BASE}/api/submissions`);
+export async function fetchSubmissions(adminWallet?: string): Promise<SubmissionItem[]> {
+  if (!adminWallet) return [];
+  const res = await fetch(`${API_BASE}/api/submissions`, {
+    headers: {
+      "X-Admin-Wallet": adminWallet,
+    },
+  });
   if (!res.ok) return [];
   return res.json();
 }
