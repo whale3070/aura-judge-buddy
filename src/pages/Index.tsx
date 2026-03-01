@@ -184,16 +184,10 @@ export default function Index() {
             to="/submit"
             className="text-xs border border-primary/40 px-4 py-2 text-primary hover:bg-primary/10 hover:shadow-[0_0_12px_hsl(var(--primary)/0.3)] transition-all"
           >
-            📋 项目提交入口 (PROJECT SUBMISSION) →
+            📋 项目提交 / 首页 (HOME) →
           </Link>
           <Link
-            to={
-              adminHash === null
-                ? "/admin/LOADING"
-                : adminHash
-                  ? `/admin/${adminHash}`
-                  : "/admin/NO_ADMIN_HASH"
-            }
+            to={adminHash ? `/?h=${encodeURIComponent(adminHash)}` : "/"}
             className="text-xs border border-secondary/40 px-4 py-2 text-secondary hover:bg-secondary/10 hover:shadow-[0_0_12px_hsl(var(--secondary)/0.3)] transition-all"
           >
             🛡️ 管理后台 (ADMIN) →

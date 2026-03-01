@@ -109,10 +109,10 @@ export default function Submit() {
         {/* Nav */}
         <div className="flex items-center justify-between mb-6">
           <Link
-            to="/"
+            to="/submit"
             className="text-xs text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-1.5"
           >
-            ← 返回裁决系统 (BACK)
+            ← 首页 (HOME)
           </Link>
         </div>
 

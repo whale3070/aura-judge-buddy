@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { fetchRankings, fetchSubmissions, fetchAdminConfig, type RankingItem, type SubmissionItem } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import { useWallet } from "@/hooks/useWallet";
@@ -8,7 +8,8 @@ type SortKey = "rank" | "score" | "time" | "name";
 type SortDir = "asc" | "desc";
 
 export default function Admin() {
-  const { hash } = useParams<{ hash?: string }>();
+  const [searchParams] = useSearchParams();
+  const hash = searchParams.get("h") ?? undefined;
   const wallet = useWallet();
 
   const [rankings, setRankings] = useState<RankingItem[]>([]);
@@ -34,6 +35,13 @@ export default function Admin() {
 
   const hashOk = adminHash ? hash === adminHash : true;
   const isAdmin = !!wallet.address && !!adminWallet && wallet.address.toLowerCase() === adminWallet;
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!configLoading && !hashOk) {
+      navigate("/submit", { replace: true });
+    }
+  }, [configLoading, hashOk, navigate]);
 
   useEffect(() => {
     if (!hashOk || !isAdmin || !wallet.address) {
@@ -87,7 +95,7 @@ export default function Admin() {
   if (!hashOk) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
-        INVALID ADMIN LINK
+        正在跳转到首页…
       </div>
     );
   }
@@ -133,6 +141,9 @@ export default function Admin() {
             🛡️ ADMIN CONSOLE
           </h1>
           <div className="flex gap-3 items-center">
+            <Link to="/submit" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
+              首页 / 项目提交
+            </Link>
             {wallet.address && (
               <span className="text-xs text-muted-foreground font-mono">
                 {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
