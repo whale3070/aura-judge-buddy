@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-
 import Index from "./pages/Index";
 import Submit from "./pages/Submit";
 import Admin from "./pages/Admin";
+import Ranking from "./pages/Ranking";
 import NotFound from "./pages/NotFound";
 
 function AdminHashRedirect() {
@@ -24,6 +25,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Admin />} />
           <Route path="/submit" element={<Submit />} />
+          <Route path="/ranking" element={<Ranking />} />
           <Route path="/judge" element={<Index />} />
           <Route path="/admin/:hash" element={<AdminHashRedirect />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

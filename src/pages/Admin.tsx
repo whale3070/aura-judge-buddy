@@ -14,7 +14,8 @@ export default function Admin() {
 
   const [rankings, setRankings] = useState<RankingItem[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [rankingsLoading, setRankingsLoading] = useState(true);
+  const [submissionsLoading, setSubmissionsLoading] = useState(true);
   const [adminHash, setAdminHash] = useState<string | null>(null);
   const [adminWallet, setAdminWallet] = useState<string>("");
   const [configLoading, setConfigLoading] = useState(true);
@@ -43,18 +44,28 @@ export default function Admin() {
     }
   }, [configLoading, hashOk, navigate]);
 
+  // 排名接口公开，有 hash 即可加载
   useEffect(() => {
-    if (!hashOk || !isAdmin || !wallet.address) {
-      setDataLoading(false);
+    if (!hashOk) {
+      setRankingsLoading(false);
       return;
     }
-    setDataLoading(true);
-    Promise.all([fetchRankings(), fetchSubmissions(wallet.address)])
-      .then(([r, s]) => {
-        setRankings(r);
-        setSubmissions(s);
-      })
-      .finally(() => setDataLoading(false));
+    setRankingsLoading(true);
+    fetchRankings()
+      .then(setRankings)
+      .finally(() => setRankingsLoading(false));
+  }, [hashOk]);
+
+  // 提交列表需管理员钱包
+  useEffect(() => {
+    if (!hashOk || !isAdmin || !wallet.address) {
+      setSubmissionsLoading(false);
+      return;
+    }
+    setSubmissionsLoading(true);
+    fetchSubmissions(wallet.address)
+      .then(setSubmissions)
+      .finally(() => setSubmissionsLoading(false));
   }, [hashOk, isAdmin, wallet.address]);
 
   const filtered = useMemo(() => {
@@ -100,38 +111,6 @@ export default function Admin() {
     );
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-5">
-        <div className="w-full max-w-md border border-primary/40 p-8 bg-card shadow-[0_0_30px_hsl(var(--primary)/0.1)]">
-          <h1 className="text-center text-2xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)] mb-4">
-            🛡️ ADMIN ACCESS
-          </h1>
-          <p className="text-xs text-muted-foreground mb-4">
-            仅允许绑定的钱包地址访问管理后台。请连接管理员钱包：
-          </p>
-          <button
-            onClick={wallet.connect}
-            disabled={wallet.connecting}
-            className="w-full bg-primary text-primary-foreground font-bold py-3 text-sm tracking-wider hover:shadow-[0_0_20px_hsl(var(--primary)/0.6)] transition-all disabled:opacity-50"
-          >
-            {wallet.connecting ? "CONNECTING..." : "连接钱包 (CONNECT WALLET)"}
-          </button>
-          {wallet.address && (
-            <div className="mt-3 text-xs text-muted-foreground break-all">
-              当前地址：<span className="font-mono">{wallet.address}</span>
-            </div>
-          )}
-          {wallet.error && (
-            <div className="mt-2 text-xs text-destructive">
-              {wallet.error}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background p-5">
       <div className="max-w-[1200px] mx-auto border border-primary/40 p-8 bg-card shadow-[0_0_30px_hsl(var(--primary)/0.1)]">
@@ -140,14 +119,28 @@ export default function Admin() {
           <h1 className="text-2xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)]">
             🛡️ ADMIN CONSOLE
           </h1>
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3 items-center flex-wrap">
             <Link to="/submit" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
               首页 / 项目提交
             </Link>
-            {wallet.address && (
+            <Link to="/ranking" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
+              项目排名
+            </Link>
+            <Link to="/judge" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
+              裁决系统
+            </Link>
+            {isAdmin && wallet.address ? (
               <span className="text-xs text-muted-foreground font-mono">
                 {wallet.address.slice(0, 6)}...{wallet.address.slice(-4)}
               </span>
+            ) : (
+              <button
+                onClick={wallet.connect}
+                disabled={wallet.connecting}
+                className="text-xs border border-primary/40 px-3 py-1.5 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+              >
+                {wallet.connecting ? "连接中…" : "连接钱包"}
+              </button>
             )}
           </div>
         </div>
@@ -206,7 +199,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {dataLoading ? (
+                  {rankingsLoading ? (
                     <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">加载中...</td></tr>
                   ) : filtered.length === 0 ? (
                     <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">无数据</td></tr>
@@ -253,7 +246,21 @@ export default function Admin() {
         )}
 
         {tab === "submissions" && (
-          <SubmissionsTab submissions={submissions} loading={dataLoading} onViewFile={setSelectedFile} />
+          isAdmin ? (
+            <SubmissionsTab submissions={submissions} loading={submissionsLoading} onViewFile={setSelectedFile} />
+          ) : (
+            <div className="border border-border p-8 bg-muted/20 text-center">
+              <p className="text-muted-foreground mb-4">查看提交列表需连接管理员钱包</p>
+              <button
+                onClick={wallet.connect}
+                disabled={wallet.connecting}
+                className="bg-primary text-primary-foreground font-bold py-2 px-6 text-sm tracking-wider hover:shadow-[0_0_20px_hsl(var(--primary)/0.6)] transition-all disabled:opacity-50"
+              >
+                {wallet.connecting ? "连接中…" : "连接钱包 (CONNECT WALLET)"}
+              </button>
+              {wallet.error && <p className="mt-2 text-xs text-destructive">{wallet.error}</p>}
+            </div>
+          )
         )}
 
         {tab === "submissions" && selectedFile && (

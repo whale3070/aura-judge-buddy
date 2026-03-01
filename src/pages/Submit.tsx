@@ -107,13 +107,21 @@ export default function Submit() {
 
       <div className="max-w-[800px] mx-auto border border-primary/40 p-8 shadow-[0_0_30px_hsl(var(--primary)/0.1)] bg-card relative">
         {/* Nav */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
           <Link
             to="/submit"
             className="text-xs text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-1.5"
           >
             ← 首页 (HOME)
           </Link>
+          <div className="flex gap-2">
+            <Link to="/ranking" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
+              项目排名
+            </Link>
+            <Link to="/judge" className="text-xs border border-primary/40 px-3 py-1.5 text-primary hover:bg-primary/10 transition-colors">
+              裁决系统
+            </Link>
+          </div>
         </div>
 
         <h1 className="text-center text-3xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)] animate-flicker mb-1">
