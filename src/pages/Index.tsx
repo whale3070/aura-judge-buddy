@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
 import { fetchFiles, submitAudit, fetchRankings, type AuditReport, type RankingItem } from "@/lib/api";
 import { JUDGE_PROMPT } from "@/lib/prompts";
 import RankingTable from "@/components/RankingTable";
@@ -165,9 +166,18 @@ export default function Index() {
         <h1 className="text-center text-4xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)] animate-flicker mb-1">
           ⚖️ AURA JUDGMENT SYSTEM
         </h1>
-        <p className="text-center text-xs text-muted-foreground mb-8 pb-2.5 border-b border-border">
+        <p className="text-center text-xs text-muted-foreground mb-4 pb-2.5 border-b border-border">
           PREDICTIVE AUDIT ENGINE // 2026 VER. // MULTI-AGENT HACKATHON JUDGE
         </p>
+
+        <div className="flex justify-center mb-6">
+          <Link
+            to="/submit"
+            className="text-xs border border-primary/40 px-4 py-2 text-primary hover:bg-primary/10 hover:shadow-[0_0_12px_hsl(var(--primary)/0.3)] transition-all"
+          >
+            📋 项目提交入口 (PROJECT SUBMISSION) →
+          </Link>
+        </div>
 
         <RankingTable rankings={rankings} loading={rankingsLoading} />
 
