@@ -2,3 +2,6 @@ project_id = "ffkmvdvpewsgenaxeouu"
 
 [functions.api-proxy]
 verify_jwt = false
+
+[functions.file-titles]
+verify_jwt = false
