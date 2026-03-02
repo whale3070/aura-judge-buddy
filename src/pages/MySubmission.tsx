@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { fetchSubmissionById, fetchRankings, fetchJudgeResult, type SubmissionItem, type RankingItem, type JudgeResult } from "@/lib/api";
+import { fetchSubmissionById, fetchRankings, fetchJudgeResult, fetchFileTitles, type SubmissionItem, type RankingItem, type JudgeResult } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 
 export default function MySubmission() {
@@ -10,15 +10,17 @@ export default function MySubmission() {
   const [loading, setLoading] = useState(true);
   const [scores, setScores] = useState<Record<string, JudgeResult>>({});
   const [scoresLoading, setScoresLoading] = useState(false);
+  const [titleMap, setTitleMap] = useState<Record<string, string>>({});
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    Promise.all([fetchSubmissionById(id), fetchRankings()])
-      .then(([sub, rank]) => {
+    Promise.all([fetchSubmissionById(id), fetchRankings(), fetchFileTitles()])
+      .then(([sub, rank, titles]) => {
         setSubmission(sub ?? null);
         setRankings(rank ?? []);
+        setTitleMap(titles);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -165,7 +167,14 @@ export default function MySubmission() {
                       >
                         <td className="p-3 text-muted-foreground">{i + 1}</td>
                         <td className="p-3 text-foreground/90 font-mono text-xs">
-                          {item.file_name}
+                          {titleMap[item.file_name] ? (
+                            <div>
+                              <div className="font-bold font-sans text-sm">{titleMap[item.file_name]}</div>
+                              <div className="text-muted-foreground mt-0.5">{item.file_name}</div>
+                            </div>
+                          ) : (
+                            item.file_name
+                          )}
                           {isMine && <span className="ml-2 text-primary text-[10px]">(我的)</span>}
                         </td>
                         <td className={`p-3 ${scoreClass}`}>{item.avg_score.toFixed(1)}</td>

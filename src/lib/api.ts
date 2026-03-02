@@ -105,6 +105,17 @@ export async function fetchSubmissions(adminWallet?: string): Promise<Submission
   return res.json();
 }
 
+export async function fetchFileTitles(): Promise<Record<string, string>> {
+  try {
+    const url = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/file-titles`;
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    return res.json();
+  } catch {
+    return {};
+  }
+}
+
 export async function fetchAdminConfig(): Promise<AdminConfig> {
   try {
     const res = await fetch(`${API_BASE}/api/admin-config`);

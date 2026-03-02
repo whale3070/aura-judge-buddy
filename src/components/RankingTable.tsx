@@ -5,9 +5,10 @@ interface Props {
   loading: boolean;
   selectedFile?: string;
   onSelect?: (fileName: string) => void;
+  titleMap?: Record<string, string>;
 }
 
-export default function RankingTable({ rankings, loading, selectedFile, onSelect }: Props) {
+export default function RankingTable({ rankings, loading, selectedFile, onSelect, titleMap }: Props) {
   const scoreClass = (score: number) => {
     if (score >= 80) return "text-primary font-bold drop-shadow-[0_0_5px_hsl(var(--primary)/0.8)]";
     if (score < 60) return "text-destructive font-bold";
@@ -49,7 +50,16 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
                   }`}
                 >
                   <td className="p-3 text-muted-foreground">{i + 1}</td>
-                  <td className="p-3 text-foreground/90">{item.file_name}</td>
+                  <td className="p-3 text-foreground/90">
+                    {titleMap?.[item.file_name] ? (
+                      <div>
+                        <div className="font-bold">{titleMap[item.file_name]}</div>
+                        <div className="text-xs text-muted-foreground font-mono mt-0.5">{item.file_name}</div>
+                      </div>
+                    ) : (
+                      <span className="font-mono text-xs">{item.file_name}</span>
+                    )}
+                  </td>
                   <td className={`p-3 ${scoreClass(item.avg_score)}`}>{item.avg_score.toFixed(1)}%</td>
                   <td className="p-3 text-muted-foreground text-xs">{new Date(item.timestamp).toLocaleString()}</td>
                 </tr>

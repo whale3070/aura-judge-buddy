@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { fetchRankings, fetchSubmissions, fetchAdminConfig, type RankingItem, type SubmissionItem } from "@/lib/api";
+import { fetchRankings, fetchSubmissions, fetchAdminConfig, fetchFileTitles, type RankingItem, type SubmissionItem } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import { useWallet } from "@/hooks/useWallet";
 
@@ -24,6 +24,7 @@ export default function Admin() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [tab, setTab] = useState<"rankings" | "submissions">("rankings");
+  const [titleMap, setTitleMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchAdminConfig()
@@ -51,8 +52,8 @@ export default function Admin() {
       return;
     }
     setRankingsLoading(true);
-    fetchRankings()
-      .then(setRankings)
+    Promise.all([fetchRankings(), fetchFileTitles()])
+      .then(([r, t]) => { setRankings(r); setTitleMap(t); })
       .finally(() => setRankingsLoading(false));
   }, [hashOk]);
 
@@ -216,7 +217,16 @@ export default function Admin() {
                           }`}
                         >
                           <td className="p-3 text-muted-foreground">{i + 1}</td>
-                          <td className="p-3 text-foreground/90 font-mono text-xs">{item.file_name}</td>
+                          <td className="p-3 text-foreground/90 font-mono text-xs">
+                            {titleMap[item.file_name] ? (
+                              <div>
+                                <div className="font-bold font-sans text-sm">{titleMap[item.file_name]}</div>
+                                <div className="text-muted-foreground mt-0.5">{item.file_name}</div>
+                              </div>
+                            ) : (
+                              item.file_name
+                            )}
+                          </td>
                           <td className={`p-3 font-bold ${
                             item.avg_score >= 80 ? "text-primary" : item.avg_score < 60 ? "text-destructive" : "text-warning"
                           }`}>
