@@ -9,6 +9,21 @@ interface Props {
 }
 
 export default function RankingTable({ rankings, loading, selectedFile, onSelect, titleMap }: Props) {
+  // Merge rankings by project title: keep highest score per project
+  const mergedRankings = (() => {
+    if (!titleMap || Object.keys(titleMap).length === 0) return rankings;
+
+    const projectMap = new Map<string, RankingItem>();
+    for (const item of rankings) {
+      const title = titleMap[item.file_name] || item.file_name;
+      const existing = projectMap.get(title);
+      if (!existing || item.avg_score > existing.avg_score) {
+        projectMap.set(title, item);
+      }
+    }
+    return Array.from(projectMap.values()).sort((a, b) => b.avg_score - a.avg_score);
+  })();
+
   const scoreClass = (score: number) => {
     if (score >= 80) return "text-primary font-bold drop-shadow-[0_0_5px_hsl(var(--primary)/0.8)]";
     if (score < 60) return "text-destructive font-bold";
@@ -39,7 +54,7 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
             ) : rankings.length === 0 ? (
               <tr><td colSpan={4} className="p-3 text-center text-muted-foreground">VOID_DATA</td></tr>
             ) : (
-              rankings.map((item, i) => (
+              mergedRankings.map((item, i) => (
                 <tr
                   key={item.file_name}
                   onClick={() => onSelect?.(item.file_name)}
