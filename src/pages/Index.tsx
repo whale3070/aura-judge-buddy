@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { fetchFiles, submitAudit, fetchRankings, fetchAdminConfig, type AuditReport, type RankingItem } from "@/lib/api";
+import {
+  fetchFiles,
+  submitAudit,
+  fetchRankings,
+  fetchAdminConfig,
+  fetchFileTitles,
+  type AuditReport,
+  type RankingItem,
+} from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import { JUDGE_PROMPT } from "@/lib/prompts";
 import RankingTable from "@/components/RankingTable";
@@ -33,6 +41,7 @@ export default function Index() {
   const [prompt, setPrompt] = useState(JUDGE_PROMPT);
   const [selectedModels, setSelectedModels] = useState(["deepseek", "doubao"]);
   const [rankings, setRankings] = useState<RankingItem[]>([]);
+  const [titleMap, setTitleMap] = useState<Record<string, string>>({});
   const [rankingsLoading, setRankingsLoading] = useState(true);
   const [reports, setReports] = useState<ReportEntry[]>([]);
   const [selectedRankingFile, setSelectedRankingFile] = useState<string | null>(null);
@@ -45,17 +54,18 @@ export default function Index() {
   const [adminHash, setAdminHash] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    try {
-      const f = await fetchFiles();
-      setFiles(f);
-      if (f.length > 0) setSelectedFile(f[0]);
-    } catch { /* offline */ }
+    const [f, r, t] = await Promise.all([
+      fetchFiles().catch(() => []),
+      fetchRankings().catch(() => []),
+      fetchFileTitles().catch(() => ({} as Record<string, string>)),
+    ]);
+
+    setFiles(f);
+    if (f.length > 0) setSelectedFile(f[0]);
     setFilesLoading(false);
 
-    try {
-      const r = await fetchRankings();
-      setRankings(r);
-    } catch { /* offline */ }
+    setRankings(r);
+    setTitleMap(t);
     setRankingsLoading(false);
   }, []);
 
@@ -199,6 +209,7 @@ export default function Index() {
           loading={rankingsLoading}
           selectedFile={selectedRankingFile ?? undefined}
           onSelect={(f) => setSelectedRankingFile(f === selectedRankingFile ? null : f)}
+          titleMap={titleMap}
         />
 
         {selectedRankingFile && (
