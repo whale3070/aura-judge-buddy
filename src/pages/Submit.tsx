@@ -129,7 +129,7 @@ export default function Submit() {
 
         {lastSubmissionId && (
           <div className="mb-6 p-4 bg-primary/10 border border-primary/40 rounded">
-            <p className="text-sm text-foreground/90 mb-2">✅ 提交成功！你可通过下方链接查看该项目的 AI 评分与排名（仅你自己可见）。</p>
+            <p className="text-sm text-foreground/90 mb-2">✅ 提交成功！AI 评审大约需要 <strong>10 分钟</strong> 处理，请耐心等待后再查看评分结果。</p>
             <Link
               to={`/my-submission/${lastSubmissionId}`}
               className="inline-flex items-center text-sm font-bold text-primary hover:underline"
