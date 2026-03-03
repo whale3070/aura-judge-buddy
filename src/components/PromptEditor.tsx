@@ -1,4 +1,5 @@
 import { PROMPT_TAGS } from "@/lib/prompts";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   value: string;
@@ -6,10 +7,12 @@ interface Props {
 }
 
 export default function PromptEditor({ value, onChange }: Props) {
+  const { t } = useI18n();
+
   return (
     <div className="mb-5">
       <label className="block mb-2.5 font-bold text-foreground/90 text-sm border-l-[3px] border-primary pl-2.5">
-        2. 注入审计指令 (Audit Command Injection)
+        {t("promptEditor.label")}
       </label>
       <textarea
         value={value}

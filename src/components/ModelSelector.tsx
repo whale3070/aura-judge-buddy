@@ -1,4 +1,5 @@
 import { MODELS } from "@/lib/prompts";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   selected: string[];
@@ -6,6 +7,8 @@ interface Props {
 }
 
 export default function ModelSelector({ selected, onChange }: Props) {
+  const { t } = useI18n();
+
   const toggle = (id: string) => {
     onChange(
       selected.includes(id)
@@ -17,7 +20,7 @@ export default function ModelSelector({ selected, onChange }: Props) {
   return (
     <div className="mb-5">
       <label className="block mb-2.5 font-bold text-foreground/90 text-sm border-l-[3px] border-primary pl-2.5">
-        3. 召唤裁决官 (Consulting LLM Clusters)
+        {t("modelSelector.label")}
       </label>
       <div className="flex gap-5 p-4 border border-border bg-muted flex-wrap">
         {MODELS.map((m) => (

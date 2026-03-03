@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useI18n, LanguageToggle } from "@/lib/i18n";
 
 interface SubmissionForm {
   project_title: string;
@@ -27,6 +28,7 @@ const EMPTY_FORM: SubmissionForm = {
 const ACCEPTED_EXTENSIONS = [".md", ".txt", ".html", ".pdf"];
 
 export default function Submit() {
+  const { t } = useI18n();
   const [form, setForm] = useState<SubmissionForm>(EMPTY_FORM);
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -44,7 +46,7 @@ export default function Submit() {
       return ACCEPTED_EXTENSIONS.includes(ext);
     });
     if (newFiles.length < (e.target.files?.length ?? 0)) {
-      toast.warning("部分文件格式不支持，已过滤。仅支持 .md .txt .html .pdf");
+      toast.warning(t("submit.fileFilterWarn"));
     }
     setFiles((prev) => [...prev, ...newFiles]);
     e.target.value = "";
@@ -55,15 +57,15 @@ export default function Submit() {
   };
 
   const validate = (): string | null => {
-    if (!form.project_title.trim()) return "请填写项目名称";
-    if (!form.one_liner.trim()) return "请填写项目简介";
-    if (form.one_liner.length > 200) return "项目简介不能超过200字";
-    if (!form.problem.trim()) return "请填写要解决的问题";
-    if (!form.solution.trim()) return "请填写解决方案";
+    if (!form.project_title.trim()) return t("submit.validateTitle");
+    if (!form.one_liner.trim()) return t("submit.validateOneLiner");
+    if (form.one_liner.length > 200) return t("submit.validateOneLinerLen");
+    if (!form.problem.trim()) return t("submit.validateProblem");
+    if (!form.solution.trim()) return t("submit.validateSolution");
     if (form.github_url && !/^https?:\/\/.+/.test(form.github_url))
-      return "GitHub 链接格式不正确";
+      return t("submit.validateGithub");
     if (form.demo_url && !/^https?:\/\/.+/.test(form.demo_url))
-      return "Demo 链接格式不正确";
+      return t("submit.validateDemo");
     return null;
   };
 
@@ -75,7 +77,6 @@ export default function Submit() {
     }
     setSubmitting(true);
 
-    // Build FormData for multipart upload
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => {
       if (v) fd.append(k, v);
@@ -94,212 +95,142 @@ export default function Submit() {
       setForm(EMPTY_FORM);
       setFiles([]);
       setLastSubmissionId(submissionId ?? null);
-      toast.success("🎉 项目提交成功！");
+      toast.success(t("submit.submitSuccess"));
     } catch {
-      toast.error("提交失败，请检查网络或稍后重试");
+      toast.error(t("submit.submitFail"));
     }
     setSubmitting(false);
   };
 
   return (
     <div className="min-h-screen bg-background p-5 relative overflow-hidden">
-      {/* Scanline */}
       <div className="pointer-events-none fixed inset-0 z-50">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-primary/[0.03] animate-scanline" />
       </div>
 
       <div className="max-w-[800px] mx-auto border border-primary/40 p-8 shadow-[0_0_30px_hsl(var(--primary)/0.1)] bg-card relative">
-        {/* Nav */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-          <Link
-            to="/submit"
-            className="text-xs text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-1.5"
-          >
-            ← 首页 (HOME)
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/submit"
+              className="text-xs text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-1.5"
+            >
+              {t("nav.home")}
+            </Link>
+            <LanguageToggle />
+          </div>
           <div className="flex gap-2">
             <Link to="/ranking" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
-              项目排名
+              {t("nav.ranking")}
             </Link>
             <Link to="/judge" className="text-xs border border-primary/40 px-3 py-1.5 text-primary hover:bg-primary/10 transition-colors">
-              裁决系统
+              {t("nav.judge")}
             </Link>
           </div>
         </div>
 
         {lastSubmissionId && (
           <div className="mb-6 p-4 bg-primary/10 border border-primary/40 rounded">
-            <p className="text-sm text-foreground/90 mb-2">✅ 提交成功！AI 评审大约需要 <strong>10 分钟</strong> 处理，请耐心等待后再查看评分结果。</p>
+            <p className="text-sm text-foreground/90 mb-2">✅ {t("submit.successMsg")} <strong>{t("submit.successMin")}</strong> {t("submit.successWait")}</p>
             <Link
               to={`/my-submission/${lastSubmissionId}`}
               className="inline-flex items-center text-sm font-bold text-primary hover:underline"
             >
-              查看我的项目评分与排名 →
+              {t("submit.viewMyProject")}
             </Link>
           </div>
         )}
 
         <h1 className="text-center text-3xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)] animate-flicker mb-1">
-          📋 PROJECT SUBMISSION
+          {t("submit.title")}
         </h1>
         <p className="text-center text-xs text-muted-foreground mb-8 pb-2.5 border-b border-border">
-          黑客松项目提交入口 // 支持文档上传 + GitHub 链接
+          {t("submit.subtitle")}
         </p>
 
-        {/* Required Fields */}
-        <SectionLabel index={1} text="基本信息 (Required Fields)" />
+        <SectionLabel index={1} text={t("submit.section1")} />
 
-        <FieldRow label="项目名称 *" hint="project_title">
-          <input
-            value={form.project_title}
-            onChange={set("project_title")}
-            placeholder="例：Aura Judging System"
-            className="field-input"
-          />
+        <FieldRow label={t("submit.projectTitle")} hint="project_title">
+          <input value={form.project_title} onChange={set("project_title")} placeholder={t("submit.projectTitlePlaceholder")} className="field-input" />
         </FieldRow>
 
-        <FieldRow label="一句话简介 *" hint="one_liner · ≤200字">
-          <input
-            value={form.one_liner}
-            onChange={set("one_liner")}
-            maxLength={200}
-            placeholder="用一句话描述你的项目"
-            className="field-input"
-          />
-          <div className="text-right text-[10px] text-muted-foreground mt-0.5">
-            {form.one_liner.length}/200
-          </div>
+        <FieldRow label={t("submit.oneLiner")} hint="one_liner · ≤200">
+          <input value={form.one_liner} onChange={set("one_liner")} maxLength={200} placeholder={t("submit.oneLinerPlaceholder")} className="field-input" />
+          <div className="text-right text-[10px] text-muted-foreground mt-0.5">{form.one_liner.length}/200</div>
         </FieldRow>
 
-        <FieldRow label="解决的问题 *" hint="problem">
-          <textarea
-            value={form.problem}
-            onChange={set("problem")}
-            rows={3}
-            placeholder="你的项目解决了什么问题？"
-            className="field-input resize-y"
-          />
+        <FieldRow label={t("submit.problem")} hint="problem">
+          <textarea value={form.problem} onChange={set("problem")} rows={3} placeholder={t("submit.problemPlaceholder")} className="field-input resize-y" />
         </FieldRow>
 
-        <FieldRow label="解决方案 *" hint="solution">
-          <textarea
-            value={form.solution}
-            onChange={set("solution")}
-            rows={3}
-            placeholder="你的解决方案是什么？"
-            className="field-input resize-y"
-          />
+        <FieldRow label={t("submit.solution")} hint="solution">
+          <textarea value={form.solution} onChange={set("solution")} rows={3} placeholder={t("submit.solutionPlaceholder")} className="field-input resize-y" />
         </FieldRow>
 
-        {/* Optional Fields */}
-        <SectionLabel index={2} text="链接与生态 (Optional)" />
+        <SectionLabel index={2} text={t("submit.section2")} />
 
-        <FieldRow label="Avalanche 生态适配理由" hint="why_this_chain · 建议填写">
-          <textarea
-            value={form.why_this_chain}
-            onChange={set("why_this_chain")}
-            rows={2}
-            placeholder="为什么选择 Avalanche？你的项目如何与该生态结合？"
-            className="field-input resize-y"
-          />
+        <FieldRow label={t("submit.whyChain")} hint="why_this_chain">
+          <textarea value={form.why_this_chain} onChange={set("why_this_chain")} rows={2} placeholder={t("submit.whyChainPlaceholder")} className="field-input resize-y" />
         </FieldRow>
 
-        <FieldRow label="GitHub 仓库链接" hint="github_url">
-          <input
-            value={form.github_url}
-            onChange={set("github_url")}
-            placeholder="https://github.com/your-org/your-repo"
-            className="field-input"
-          />
+        <FieldRow label={t("submit.githubUrl")} hint="github_url">
+          <input value={form.github_url} onChange={set("github_url")} placeholder="https://github.com/your-org/your-repo" className="field-input" />
         </FieldRow>
 
-        <FieldRow label="Demo / 演示链接" hint="demo_url">
-          <input
-            value={form.demo_url}
-            onChange={set("demo_url")}
-            placeholder="https://your-demo.app"
-            className="field-input"
-          />
+        <FieldRow label={t("submit.demoUrl")} hint="demo_url">
+          <input value={form.demo_url} onChange={set("demo_url")} placeholder="https://your-demo.app" className="field-input" />
         </FieldRow>
 
-        <FieldRow label="补充文本" hint="docs_text · 可粘贴文档内容">
-          <textarea
-            value={form.docs_text}
-            onChange={set("docs_text")}
-            rows={4}
-            placeholder="可在此粘贴项目文档、白皮书等文本内容..."
-            className="field-input resize-y"
-          />
+        <FieldRow label={t("submit.docsText")} hint="docs_text">
+          <textarea value={form.docs_text} onChange={set("docs_text")} rows={4} placeholder={t("submit.docsTextPlaceholder")} className="field-input resize-y" />
         </FieldRow>
 
-        {/* File Upload */}
-        <SectionLabel index={3} text="文件上传 (File Upload)" />
+        <SectionLabel index={3} text={t("submit.section3")} />
 
         <div className="mb-4">
           <p className="text-xs text-muted-foreground mb-3">
-            支持格式：<code className="bg-muted px-1 border border-border text-foreground/80">.md</code>{" "}
+            <code className="bg-muted px-1 border border-border text-foreground/80">.md</code>{" "}
             <code className="bg-muted px-1 border border-border text-foreground/80">.txt</code>{" "}
             <code className="bg-muted px-1 border border-border text-foreground/80">.html</code>{" "}
             <code className="bg-muted px-1 border border-border text-foreground/80">.pdf</code>
-            　（PDF 仅做存储，不保证全解析）
+            　{t("submit.fileNote")}
           </p>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".md,.txt,.html,.pdf"
-            multiple
-            onChange={handleFileAdd}
-            className="hidden"
-          />
+          <input ref={fileInputRef} type="file" accept=".md,.txt,.html,.pdf" multiple onChange={handleFileAdd} className="hidden" />
 
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             className="w-full border-2 border-dashed border-primary/30 hover:border-primary/60 py-6 text-sm text-muted-foreground hover:text-primary transition-all cursor-pointer"
           >
-            + 点击选择文件 / Click to upload
+            {t("submit.uploadBtn")}
           </button>
 
           {files.length > 0 && (
             <div className="mt-3 space-y-1.5">
               {files.map((f, i) => (
-                <div
-                  key={`${f.name}-${i}`}
-                  className="flex items-center justify-between bg-muted border border-border px-3 py-2 text-xs"
-                >
+                <div key={`${f.name}-${i}`} className="flex items-center justify-between bg-muted border border-border px-3 py-2 text-xs">
                   <span className="text-foreground/80 truncate mr-3">
-                    {f.name}{" "}
-                    <span className="text-muted-foreground">
-                      ({(f.size / 1024).toFixed(1)} KB)
-                    </span>
+                    {f.name} <span className="text-muted-foreground">({(f.size / 1024).toFixed(1)} KB)</span>
                   </span>
-                  <button
-                    onClick={() => removeFile(i)}
-                    className="text-destructive hover:text-destructive/80 shrink-0"
-                  >
-                    ✕
-                  </button>
+                  <button onClick={() => removeFile(i)} className="text-destructive hover:text-destructive/80 shrink-0">✕</button>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Submit */}
         <button
           onClick={handleSubmit}
           disabled={submitting}
           className="w-full bg-primary text-primary-foreground font-bold py-4 text-sm tracking-wider hover:shadow-[0_0_20px_hsl(var(--primary)/0.6)] hover:-translate-y-px transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
         >
-          {submitting ? "▶ 提交中..." : "提交项目 (SUBMIT PROJECT)"}
+          {submitting ? t("submit.submitting") : t("submit.submitBtn")}
         </button>
       </div>
     </div>
   );
 }
-
-/* ── Sub-components ── */
 
 function SectionLabel({ index, text }: { index: number; text: string }) {
   return (
@@ -309,15 +240,7 @@ function SectionLabel({ index, text }: { index: number; text: string }) {
   );
 }
 
-function FieldRow({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint: string;
-  children: React.ReactNode;
-}) {
+function FieldRow({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
   return (
     <div className="mb-4">
       <div className="flex items-baseline justify-between mb-1.5">

@@ -4,8 +4,10 @@ import { fetchRankings, fetchSubmissions, fetchAdminConfig, fetchFileTitles, del
 import JudgeDetail from "@/components/JudgeDetail";
 import GradeRankingPanel from "@/components/GradeRankingPanel";
 import { useWallet } from "@/hooks/useWallet";
+import { useI18n, LanguageToggle } from "@/lib/i18n";
 
 export default function Admin() {
+  const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const hash = searchParams.get("h") ?? undefined;
   const wallet = useWallet();
@@ -17,10 +19,38 @@ export default function Admin() {
   const [adminHash, setAdminHash] = useState<string | null>(null);
   const [adminWallet, setAdminWallet] = useState<string>("");
   const [configLoading, setConfigLoading] = useState(true);
-  
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [tab, setTab] = useState<"rankings" | "submissions">("rankings");
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!wallet.address) return;
+    fetchSubmissions(wallet.address)
+      .then(setSubmissions)
+      .catch(() => setSubmissions([]));
+  }, [wallet.address]);
+
+  useEffect(() => {
+    if (!wallet.address) return;
+    fetchAdminConfig()
+      .then((cfg) => {
+        setAdminHash(cfg.admin_hash ?? "");
+        setAdminWallet((cfg.admin_wallet ?? "").toLowerCase());
+      })
+      .catch(() => {
+        setAdminHash("");
+        setAdminWallet("");
+      });
+  }, [wallet.address]);
+
+  useEffect(() => {
+    Promise.all([fetchRankings(), fetchFileTitles()])
+      .then(([r, t]) => { setRankings(r); setTitleMap(t); })
+      .catch(() => {
+        setRankings([]);
+        setTitleMap({});
+      });
+  }, []);
 
   useEffect(() => {
     fetchAdminConfig()
@@ -41,64 +71,47 @@ export default function Admin() {
     }
   }, [configLoading, hashOk, navigate]);
 
-  // 排名接口公开，有 hash 即可加载
   useEffect(() => {
-    if (!hashOk) {
-      setRankingsLoading(false);
-      return;
-    }
+    if (!hashOk) { setRankingsLoading(false); return; }
     setRankingsLoading(true);
     Promise.all([fetchRankings(), fetchFileTitles()])
       .then(([r, t]) => { setRankings(r); setTitleMap(t); })
       .finally(() => setRankingsLoading(false));
   }, [hashOk]);
 
-  // 提交列表需管理员钱包
   useEffect(() => {
-    if (!hashOk || !isAdmin || !wallet.address) {
-      setSubmissionsLoading(false);
-      return;
-    }
+    if (!hashOk || !isAdmin || !wallet.address) { setSubmissionsLoading(false); return; }
     setSubmissionsLoading(true);
     fetchSubmissions(wallet.address)
       .then(setSubmissions)
       .finally(() => setSubmissionsLoading(false));
   }, [hashOk, isAdmin, wallet.address]);
 
-
   if (configLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
-        LOADING...
-      </div>
-    );
+    return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">LOADING...</div>;
   }
 
   if (!hashOk) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
-        正在跳转到首页…
-      </div>
-    );
+    return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">{t("admin.redirecting")}</div>;
   }
 
   return (
     <div className="min-h-screen bg-background p-5">
       <div className="max-w-[1200px] mx-auto border border-primary/40 p-8 bg-card shadow-[0_0_30px_hsl(var(--primary)/0.1)]">
-        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-display font-bold text-primary drop-shadow-[0_0_10px_hsl(var(--primary)/0.5)]">
             🛡️ ADMIN CONSOLE
           </h1>
           <div className="flex gap-3 items-center flex-wrap">
+            <LanguageToggle />
             <Link to="/submit" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
-              首页 / 项目提交
+              {t("nav.submit")}
             </Link>
             <Link to="/ranking" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
-              项目排名
+              {t("nav.ranking")}
             </Link>
             <Link to="/judge" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
-              裁决系统
+              {t("nav.judge")}
             </Link>
             {isAdmin && wallet.address ? (
               <span className="text-xs text-muted-foreground font-mono">
@@ -110,25 +123,22 @@ export default function Admin() {
                 disabled={wallet.connecting}
                 className="text-xs border border-primary/40 px-3 py-1.5 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
               >
-                {wallet.connecting ? "连接中…" : "连接钱包"}
+                {wallet.connecting ? t("admin.connecting") : t("admin.connectWallet")}
               </button>
             )}
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-0 mb-6 border-b border-border">
-          {(["rankings", "submissions"] as const).map((t) => (
+          {(["rankings", "submissions"] as const).map((tb) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={tb}
+              onClick={() => setTab(tb)}
               className={`px-5 py-2.5 text-sm font-bold tracking-wider transition-colors ${
-                tab === t
-                  ? "text-primary border-b-2 border-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                tab === tb ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t === "rankings" ? "📊 项目排名" : "📋 提交管理"}
+              {tb === "rankings" ? t("admin.rankings") : t("admin.submissions")}
             </button>
           ))}
         </div>
@@ -142,13 +152,13 @@ export default function Admin() {
             <SubmissionsTab submissions={submissions} loading={submissionsLoading} onViewFile={setSelectedFile} adminWallet={wallet.address!} onDeleted={(id) => setSubmissions(prev => prev.filter(s => s.id !== id))} />
           ) : (
             <div className="border border-border p-8 bg-muted/20 text-center">
-              <p className="text-muted-foreground mb-4">查看提交列表需连接管理员钱包</p>
+              <p className="text-muted-foreground mb-4">{t("admin.walletRequired")}</p>
               <button
                 onClick={wallet.connect}
                 disabled={wallet.connecting}
                 className="bg-primary text-primary-foreground font-bold py-2 px-6 text-sm tracking-wider hover:shadow-[0_0_20px_hsl(var(--primary)/0.6)] transition-all disabled:opacity-50"
               >
-                {wallet.connecting ? "连接中…" : "连接钱包 (CONNECT WALLET)"}
+                {wallet.connecting ? t("admin.connecting") : t("admin.connectBtn")}
               </button>
               {wallet.error && <p className="mt-2 text-xs text-destructive">{wallet.error}</p>}
             </div>
@@ -164,11 +174,7 @@ export default function Admin() {
 }
 
 function SubmissionsTab({
-  submissions,
-  loading,
-  onViewFile,
-  adminWallet,
-  onDeleted,
+  submissions, loading, onViewFile, adminWallet, onDeleted,
 }: {
   submissions: SubmissionItem[];
   loading: boolean;
@@ -176,24 +182,26 @@ function SubmissionsTab({
   adminWallet: string;
   onDeleted: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`确认删除项目「${title}」？此操作不可撤销。`)) return;
+    const msg = t("admin.confirmDelete", { title });
+    if (!confirm(msg)) return;
     setDeleting(id);
     try {
       await deleteSubmission(id, adminWallet);
       onDeleted(id);
     } catch (e: any) {
-      alert(e.message || "删除失败");
+      alert(e.message || "Delete failed");
     } finally {
       setDeleting(null);
     }
   };
 
-  if (loading) return <div className="text-muted-foreground text-sm">加载中...</div>;
-  if (submissions.length === 0) return <div className="text-muted-foreground text-sm">暂无提交</div>;
+  if (loading) return <div className="text-muted-foreground text-sm">{t("admin.loadingSub")}</div>;
+  if (submissions.length === 0) return <div className="text-muted-foreground text-sm">{t("admin.noSub")}</div>;
 
   return (
     <div className="space-y-3">
@@ -217,7 +225,7 @@ function SubmissionsTab({
               disabled={deleting === s.id}
               className="shrink-0 mx-2 text-xs border border-destructive/40 px-2.5 py-1 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
             >
-              {deleting === s.id ? "删除中…" : "🗑 删除"}
+              {deleting === s.id ? t("admin.deleting") : t("admin.delete")}
             </button>
           </div>
 
@@ -226,38 +234,29 @@ function SubmissionsTab({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <span className="text-muted-foreground text-xs">GitHub</span>
-                  <a href={s.github_url} target="_blank" rel="noreferrer" className="block text-primary hover:underline truncate">
-                    {s.github_url}
-                  </a>
+                  <a href={s.github_url} target="_blank" rel="noreferrer" className="block text-primary hover:underline truncate">{s.github_url}</a>
                 </div>
                 <div>
                   <span className="text-muted-foreground text-xs">Demo</span>
-                  <a href={s.demo_url} target="_blank" rel="noreferrer" className="block text-primary hover:underline truncate">
-                    {s.demo_url || "—"}
-                  </a>
+                  <a href={s.demo_url} target="_blank" rel="noreferrer" className="block text-primary hover:underline truncate">{s.demo_url || "—"}</a>
                 </div>
               </div>
-
               {s.why_this_chain && (
                 <div>
                   <span className="text-muted-foreground text-xs">Why this chain</span>
                   <p className="text-foreground/80 text-xs mt-1">{s.why_this_chain}</p>
                 </div>
               )}
-
               {s.md_files && s.md_files.length > 0 && (
                 <div>
-                  <span className="text-muted-foreground text-xs">关联文档 ({s.md_files.length})</span>
+                  <span className="text-muted-foreground text-xs">{t("admin.relatedDocs")} ({s.md_files.length})</span>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {s.md_files.map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => onViewFile(f)}
-                        className="text-xs border border-primary/30 px-2 py-1 text-primary hover:bg-primary/10 transition-colors"
-                      >
+                      <button key={f} onClick={() => onViewFile(f)} className="text-xs border border-primary/30 px-2 py-1 text-primary hover:bg-primary/10 transition-colors">
                         📄 {f}
                       </button>
-                    ))}
+                    ))
+                    }
                   </div>
                 </div>
               )}

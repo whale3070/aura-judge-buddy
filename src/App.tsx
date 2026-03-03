@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useParams, useSearchParams } from "react-router-dom";
+import { I18nProvider } from "@/lib/i18n";
 import Index from "./pages/Index";
 import Submit from "./pages/Submit";
 import Admin from "./pages/Admin";
@@ -25,24 +26,26 @@ function RootRoute() {
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<RootRoute />} />
-          <Route path="/submit" element={<Submit />} />
-          <Route path="/ranking" element={<Ranking />} />
-          <Route path="/my-submission/:id" element={<MySubmission />} />
-          <Route path="/judge" element={<Index />} />
-          <Route path="/admin/:hash" element={<AdminHashRedirect />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <I18nProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<RootRoute />} />
+            <Route path="/submit" element={<Submit />} />
+            <Route path="/ranking" element={<Ranking />} />
+            <Route path="/my-submission/:id" element={<MySubmission />} />
+            <Route path="/judge" element={<Index />} />
+            <Route path="/admin/:hash" element={<AdminHashRedirect />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </I18nProvider>
 );
 
 export default App;
