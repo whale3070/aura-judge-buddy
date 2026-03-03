@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { fetchRankings, fetchSubmissions, fetchAdminConfig, fetchFileTitles, type RankingItem, type SubmissionItem } from "@/lib/api";
+import { fetchRankings, fetchSubmissions, fetchAdminConfig, fetchFileTitles, deleteSubmission, type RankingItem, type SubmissionItem } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import GradeRankingPanel from "@/components/GradeRankingPanel";
 import { useWallet } from "@/hooks/useWallet";
@@ -139,7 +139,7 @@ export default function Admin() {
 
         {tab === "submissions" && (
           isAdmin ? (
-            <SubmissionsTab submissions={submissions} loading={submissionsLoading} onViewFile={setSelectedFile} />
+            <SubmissionsTab submissions={submissions} loading={submissionsLoading} onViewFile={setSelectedFile} adminWallet={wallet.address!} onDeleted={(id) => setSubmissions(prev => prev.filter(s => s.id !== id))} />
           ) : (
             <div className="border border-border p-8 bg-muted/20 text-center">
               <p className="text-muted-foreground mb-4">查看提交列表需连接管理员钱包</p>
@@ -167,12 +167,30 @@ function SubmissionsTab({
   submissions,
   loading,
   onViewFile,
+  adminWallet,
+  onDeleted,
 }: {
   submissions: SubmissionItem[];
   loading: boolean;
   onViewFile: (f: string) => void;
+  adminWallet: string;
+  onDeleted: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`确认删除项目「${title}」？此操作不可撤销。`)) return;
+    setDeleting(id);
+    try {
+      await deleteSubmission(id, adminWallet);
+      onDeleted(id);
+    } catch (e: any) {
+      alert(e.message || "删除失败");
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   if (loading) return <div className="text-muted-foreground text-sm">加载中...</div>;
   if (submissions.length === 0) return <div className="text-muted-foreground text-sm">暂无提交</div>;
@@ -181,18 +199,27 @@ function SubmissionsTab({
     <div className="space-y-3">
       {submissions.map((s) => (
         <div key={s.id} className="border border-border bg-muted/20">
-          <button
-            onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-            className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors"
-          >
-            <div className="min-w-0">
-              <div className="font-bold text-foreground/90 truncate">{s.project_title}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{s.one_liner}</div>
-            </div>
-            <div className="text-xs text-muted-foreground whitespace-nowrap ml-3">
-              {new Date(s.created_at).toLocaleString()}
-            </div>
-          </button>
+          <div className="flex items-center">
+            <button
+              onClick={() => setExpanded(expanded === s.id ? null : s.id)}
+              className="flex-1 flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors"
+            >
+              <div className="min-w-0">
+                <div className="font-bold text-foreground/90 truncate">{s.project_title}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{s.one_liner}</div>
+              </div>
+              <div className="text-xs text-muted-foreground whitespace-nowrap ml-3">
+                {new Date(s.created_at).toLocaleString()}
+              </div>
+            </button>
+            <button
+              onClick={() => handleDelete(s.id, s.project_title)}
+              disabled={deleting === s.id}
+              className="shrink-0 mx-2 text-xs border border-destructive/40 px-2.5 py-1 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+            >
+              {deleting === s.id ? "删除中…" : "🗑 删除"}
+            </button>
+          </div>
 
           {expanded === s.id && (
             <div className="p-4 border-t border-border space-y-3 text-sm">

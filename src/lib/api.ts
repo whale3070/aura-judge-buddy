@@ -116,6 +116,17 @@ export async function fetchFileTitles(): Promise<Record<string, string>> {
   }
 }
 
+export async function deleteSubmission(id: string, adminWallet: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/submission/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { "X-Admin-Wallet": adminWallet },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "删除失败" }));
+    throw new Error(err.error || err.message || "删除失败");
+  }
+}
+
 export async function fetchAdminConfig(): Promise<AdminConfig> {
   try {
     const res = await fetch(`${API_BASE}/api/admin-config`);
