@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { AuditReport } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   fileName: string;
@@ -19,6 +20,7 @@ function scorePillClass(avg: number | null) {
 }
 
 export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -45,12 +47,12 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
           {error ? (
             <div className="text-destructive font-bold">ERROR: {error}</div>
           ) : reports.length === 0 ? (
-            <div className="text-muted-foreground">等待数据...</div>
+            <div className="text-muted-foreground">{t("report.waiting")}</div>
           ) : (
             reports.map((report, i) => (
               <div key={i} className="mt-2.5 first:mt-0">
                 <div className="flex justify-between items-center p-2.5 bg-muted/80 border-l-[6px] border-l-primary font-bold text-foreground/90">
-                  <span>▌ 判官节点: {report.model_name.toUpperCase()}</span>
+                  <span>▌ {t("report.judgeNode")} {report.model_name.toUpperCase()}</span>
                   {report.score != null && (
                     <span className="bg-primary text-primary-foreground px-2.5 py-0.5 text-sm shadow-[0_0_8px_hsl(var(--primary)/0.55)]">
                       {report.score}

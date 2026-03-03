@@ -1,4 +1,5 @@
 import type { RankingItem } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   rankings: RankingItem[];
@@ -9,10 +10,10 @@ interface Props {
 }
 
 export default function RankingTable({ rankings, loading, selectedFile, onSelect, titleMap }: Props) {
-  // Merge rankings by project title: keep highest score per project
+  const { t } = useI18n();
+
   const mergedRankings = (() => {
     if (!titleMap || Object.keys(titleMap).length === 0) return rankings;
-
     const projectMap = new Map<string, RankingItem>();
     for (const item of rankings) {
       const title = titleMap[item.file_name] || item.file_name;
@@ -36,23 +37,23 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
         GOLD_VAULT_PROTOCOL
       </div>
       <h3 className="text-secondary text-center text-lg tracking-[4px] font-display font-bold drop-shadow-[0_0_5px_hsl(var(--secondary)/0.6)] mt-0 mb-4">
-        🏆 终焉大盘：逻辑生存率排行榜
+        {t("ranking.tableTitle")}
       </h3>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-secondary/50">
-              <th className="p-3 text-left text-foreground/80 w-20">RANK</th>
-              <th className="p-3 text-left text-foreground/80">项目文档</th>
-              <th className="p-3 text-left text-foreground/80 w-36">逻辑生存率</th>
-              <th className="p-3 text-left text-foreground/80 w-48">存证时间</th>
+              <th className="p-3 text-left text-foreground/80 w-20">{t("ranking.rank")}</th>
+              <th className="p-3 text-left text-foreground/80">{t("ranking.projectDoc")}</th>
+              <th className="p-3 text-left text-foreground/80 w-36">{t("ranking.survivalRate")}</th>
+              <th className="p-3 text-left text-foreground/80 w-48">{t("ranking.timestamp")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={4} className="p-3 text-center text-muted-foreground">正在同步金库协议历史存证...</td></tr>
+              <tr><td colSpan={4} className="p-3 text-center text-muted-foreground">{t("ranking.loading")}</td></tr>
             ) : rankings.length === 0 ? (
-              <tr><td colSpan={4} className="p-3 text-center text-muted-foreground">VOID_DATA</td></tr>
+              <tr><td colSpan={4} className="p-3 text-center text-muted-foreground">{t("ranking.empty")}</td></tr>
             ) : (
               mergedRankings.map((item, i) => (
                 <tr

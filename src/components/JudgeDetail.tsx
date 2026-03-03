@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { fetchJudgeResult, type JudgeResult } from "@/lib/api";
 import ReportCard from "@/components/ReportCard";
 import DocumentPanel from "@/components/DocumentPanel";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   fileName: string;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function JudgeDetail({ fileName, onClose }: Props) {
+  const { t } = useI18n();
   const [result, setResult] = useState<JudgeResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,18 +29,18 @@ export default function JudgeDetail({ fileName, onClose }: Props) {
     <div className="border-2 border-primary/30 p-5 mb-6 bg-card relative animate-fade-in">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-primary text-lg tracking-[2px] font-display font-bold">
-          📄 评审详情：{fileName}
+          {t("judgeDetail.title")}{fileName}
         </h3>
         <button
           onClick={onClose}
           className="text-xs border border-muted-foreground/40 px-3 py-1 text-muted-foreground hover:bg-muted transition-colors"
         >
-          ✕ 关闭
+          {t("judgeDetail.close")}
         </button>
       </div>
 
       {loading && (
-        <div className="text-muted-foreground text-sm py-4 text-center">正在加载评审数据...</div>
+        <div className="text-muted-foreground text-sm py-4 text-center">{t("judgeDetail.loading")}</div>
       )}
 
       {error && (
@@ -48,13 +50,10 @@ export default function JudgeDetail({ fileName, onClose }: Props) {
       {result && (
         <>
           <div className="flex gap-4 text-xs text-muted-foreground mb-3">
-            <span>综合评分：<span className="text-primary font-bold">{result.avg_score.toFixed(1)}</span></span>
-            <span>评审时间：{new Date(result.timestamp).toLocaleString()}</span>
+            <span>{t("judgeDetail.overallScore")}<span className="text-primary font-bold">{result.avg_score.toFixed(1)}</span></span>
+            <span>{t("judgeDetail.reviewTime")}{new Date(result.timestamp).toLocaleString()}</span>
           </div>
-
-          {/* Document Panel */}
           <DocumentPanel fileName={result.file_name} />
-
           <div className="mt-3">
             <ReportCard
               fileName={result.file_name}
