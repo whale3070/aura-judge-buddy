@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchJudgeResult, type JudgeResult } from "@/lib/api";
 import ReportCard from "@/components/ReportCard";
+import DocumentPanel from "@/components/DocumentPanel";
 
 interface Props {
   fileName: string;
@@ -50,13 +51,19 @@ export default function JudgeDetail({ fileName, onClose }: Props) {
             <span>综合评分：<span className="text-primary font-bold">{result.avg_score.toFixed(1)}</span></span>
             <span>评审时间：{new Date(result.timestamp).toLocaleString()}</span>
           </div>
-          <ReportCard
-            fileName={result.file_name}
-            avgScore={result.avg_score}
-            statusText="JUDGE_RESULT"
-            reports={result.reports}
-            defaultOpen={true}
-          />
+
+          {/* Document Panel */}
+          <DocumentPanel fileName={result.file_name} />
+
+          <div className="mt-3">
+            <ReportCard
+              fileName={result.file_name}
+              avgScore={result.avg_score}
+              statusText="JUDGE_RESULT"
+              reports={result.reports}
+              defaultOpen={true}
+            />
+          </div>
         </>
       )}
     </div>
