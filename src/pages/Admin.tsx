@@ -1,11 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { fetchRankings, fetchSubmissions, fetchAdminConfig, fetchFileTitles, type RankingItem, type SubmissionItem } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
+import GradeRankingPanel from "@/components/GradeRankingPanel";
 import { useWallet } from "@/hooks/useWallet";
-
-type SortKey = "rank" | "score" | "time" | "name";
-type SortDir = "asc" | "desc";
 
 export default function Admin() {
   const [searchParams] = useSearchParams();
@@ -19,9 +17,7 @@ export default function Admin() {
   const [adminHash, setAdminHash] = useState<string | null>(null);
   const [adminWallet, setAdminWallet] = useState<string>("");
   const [configLoading, setConfigLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("score");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [tab, setTab] = useState<"rankings" | "submissions">("rankings");
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
@@ -69,32 +65,6 @@ export default function Admin() {
       .finally(() => setSubmissionsLoading(false));
   }, [hashOk, isAdmin, wallet.address]);
 
-  const filtered = useMemo(() => {
-    let items = [...rankings];
-    if (search) {
-      const q = search.toLowerCase();
-      items = items.filter((r) => r.file_name.toLowerCase().includes(q));
-    }
-    items.sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === "score") cmp = a.avg_score - b.avg_score;
-      else if (sortKey === "time") cmp = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-      else if (sortKey === "name") cmp = a.file_name.localeCompare(b.file_name);
-      return sortDir === "desc" ? -cmp : cmp;
-    });
-    return items;
-  }, [rankings, search, sortKey, sortDir]);
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("desc"); }
-  };
-
-  const sortIcon = (key: SortKey) => sortKey === key ? (sortDir === "desc" ? " ▼" : " ▲") : "";
-
-  // Find submission for a given ranking file
-  const findSubmission = (fileName: string) =>
-    submissions.find((s) => s.md_files?.includes(fileName));
 
   if (configLoading) {
     return (
@@ -164,95 +134,7 @@ export default function Admin() {
         </div>
 
         {tab === "rankings" && (
-          <>
-            {/* Search + stats */}
-            <div className="flex gap-3 mb-4 items-center">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="搜索文件名..."
-                className="field-input max-w-xs"
-              />
-              <span className="text-xs text-muted-foreground">
-                共 {filtered.length} / {rankings.length} 项
-              </span>
-            </div>
-
-            {/* Rankings table */}
-            <div className="border border-border overflow-x-auto mb-4">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="bg-muted/50 border-b border-border">
-                    <th className="p-3 text-left text-muted-foreground w-16 cursor-pointer select-none" onClick={() => toggleSort("rank")}>
-                      #{sortIcon("rank")}
-                    </th>
-                    <th className="p-3 text-left text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("name")}>
-                      文件名{sortIcon("name")}
-                    </th>
-                    <th className="p-3 text-left text-muted-foreground w-28 cursor-pointer select-none" onClick={() => toggleSort("score")}>
-                      平均分{sortIcon("score")}
-                    </th>
-                    <th className="p-3 text-left text-muted-foreground w-48 cursor-pointer select-none" onClick={() => toggleSort("time")}>
-                      时间{sortIcon("time")}
-                    </th>
-                    <th className="p-3 text-left text-muted-foreground w-24">关联项目</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rankingsLoading ? (
-                    <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">加载中...</td></tr>
-                  ) : filtered.length === 0 ? (
-                    <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">无数据</td></tr>
-                  ) : (
-                    filtered.map((item, i) => {
-                      const sub = findSubmission(item.file_name);
-                      const isSelected = selectedFile === item.file_name;
-                      return (
-                        <tr
-                          key={item.file_name}
-                          onClick={() => setSelectedFile(isSelected ? null : item.file_name)}
-                          className={`border-b border-border/50 cursor-pointer transition-colors ${
-                            isSelected ? "bg-primary/[0.08] border-l-2 border-l-primary" : "hover:bg-muted/30"
-                          }`}
-                        >
-                          <td className="p-3 text-muted-foreground">{i + 1}</td>
-                          <td className="p-3 text-foreground/90 font-mono text-xs">
-                            {titleMap[item.file_name] ? (
-                              <div>
-                                <div className="font-bold font-sans text-sm">{titleMap[item.file_name]}</div>
-                                <div className="text-muted-foreground mt-0.5">{item.file_name}</div>
-                              </div>
-                            ) : (
-                              item.file_name
-                            )}
-                          </td>
-                          <td className={`p-3 font-bold ${
-                            item.avg_score >= 80 ? "text-primary" : item.avg_score < 60 ? "text-destructive" : "text-warning"
-                          }`}>
-                            {item.avg_score.toFixed(1)}
-                          </td>
-                          <td className="p-3 text-muted-foreground text-xs">{new Date(item.timestamp).toLocaleString()}</td>
-                          <td className="p-3">
-                            {sub ? (
-                              <span className="text-xs text-secondary" title={sub.project_title}>✓</span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Detail panel */}
-            {selectedFile && (
-              <JudgeDetail fileName={selectedFile} onClose={() => setSelectedFile(null)} />
-            )}
-          </>
+          <GradeRankingPanel rankings={rankings} loading={rankingsLoading} titleMap={titleMap} />
         )}
 
         {tab === "submissions" && (
