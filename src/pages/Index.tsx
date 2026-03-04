@@ -124,6 +124,8 @@ export default function Index() {
         open: true,
         ruleVersionId: data.rule_version_id,
         ruleSha256: data.rule_sha256,
+        enableWebSearch,
+        outputLang,
       });
       const r = await fetchRankingsAPI();
       setRankings(r);
