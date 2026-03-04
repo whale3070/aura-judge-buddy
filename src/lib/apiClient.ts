@@ -53,7 +53,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
 export interface AuditReport {
   model_name: string;
   content: string;
-  score: number;
+  score?: number;
   error?: string;
 }
 
