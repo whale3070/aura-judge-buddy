@@ -1,6 +1,6 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
-import type { AuditReport } from "@/lib/api";
+import type { AuditReport } from "@/lib/apiClient";
 import { useI18n } from "@/lib/i18n";
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   reports: AuditReport[];
   error?: string;
   defaultOpen?: boolean;
+  ruleVersionId?: string;
+  ruleSha256?: string;
 }
 
 function scorePillClass(avg: number | null) {
