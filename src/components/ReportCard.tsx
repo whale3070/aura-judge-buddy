@@ -78,18 +78,43 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
 
       {open && (
         <div className="p-3.5 bg-card border-t border-border">
-          {searchQuery && (
-            <div className="mb-3">
-              <button
-                onClick={() => setShowSearchQuery(!showSearchQuery)}
-                className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-              >
-                {showSearchQuery ? "▼" : "▶"} {t("judge.searchQuery")}
-              </button>
-              {showSearchQuery && (
-                <div className="mt-1 text-xs font-mono text-muted-foreground/80 bg-muted/30 border border-border p-2">
-                  {searchQuery}
+          {/* Competitor Search Details */}
+          {enableWebSearch !== undefined && (
+            <div className="mb-3 border border-border bg-muted/20 p-3">
+              <h4 className="text-xs font-bold text-foreground/90 mb-2">{t("judge.competitorSearchDetails")}</h4>
+              {enableWebSearch && competitorResultsCount != null ? (
+                <div className="space-y-1.5 text-xs text-muted-foreground">
+                  <div>
+                    <span className="font-semibold text-foreground/80">{t("judge.resultsCount")}:</span>{" "}
+                    <span className="text-primary font-bold">{competitorResultsCount}</span>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <span className="font-semibold text-foreground/80 shrink-0">{t("judge.queryLabel")}:</span>
+                    {searchQuery ? (
+                      <code className="font-mono text-[11px] bg-muted border border-border px-1.5 py-0.5 break-all">{searchQuery}</code>
+                    ) : (
+                      <span className="italic text-muted-foreground/60">{t("judge.queryNotRecorded")}</span>
+                    )}
+                  </div>
+                  {searchQuery && (
+                    <button
+                      onClick={copyQuery}
+                      className="text-[11px] border border-primary/40 px-2 py-0.5 text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      {copiedQuery ? t("judge.copied") : t("judge.copyQuery")}
+                    </button>
+                  )}
+                  {projectKeywords && projectKeywords.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      <span className="font-semibold text-foreground/80">{t("judge.keywordsUsed")}:</span>
+                      {projectKeywords.map((kw, i) => (
+                        <Badge key={i} variant="outline" className="text-[10px] py-0 px-1.5">{kw}</Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">{t("judge.competitorSearchOff")}</p>
               )}
             </div>
           )}
