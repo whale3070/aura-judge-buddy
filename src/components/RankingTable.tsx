@@ -61,9 +61,9 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">{t("ranking.loading")}</td></tr>
+              <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">{t("ranking.loading")}</td></tr>
             ) : rankings.length === 0 ? (
-              <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">{t("ranking.empty")}</td></tr>
+              <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">{t("ranking.empty")}</td></tr>
             ) : (
               mergedRankings.map((item, i) => (
                 <tr
