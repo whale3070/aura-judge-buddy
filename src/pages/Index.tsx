@@ -37,6 +37,7 @@ interface ReportEntry {
   outputLang?: "en" | "zh";
   searchQuery?: string;
   competitorResultsCount?: number;
+  projectKeywords?: string[];
 }
 
 function extractAvgScore(reports: AuditReport[]): number | null {
