@@ -57,6 +57,7 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
           {enableWebSearch !== undefined && (
             <Badge variant={enableWebSearch ? "default" : "secondary"} className="text-[10px] py-0 px-1.5">
               {t("judge.badgeSearch")}: {enableWebSearch ? t("judge.on") : t("judge.off")}
+              {enableWebSearch && competitorResultsCount != null && ` (${competitorResultsCount})`}
             </Badge>
           )}
         </div>
