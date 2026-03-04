@@ -2,6 +2,7 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { AuditReport } from "@/lib/apiClient";
 import { useI18n } from "@/lib/i18n";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
   fileName: string;
@@ -12,6 +13,8 @@ interface Props {
   defaultOpen?: boolean;
   ruleVersionId?: string;
   ruleSha256?: string;
+  enableWebSearch?: boolean;
+  outputLang?: "en" | "zh";
 }
 
 function scorePillClass(avg: number | null) {
@@ -21,7 +24,7 @@ function scorePillClass(avg: number | null) {
   return "bg-warning text-warning-foreground border-warning/40 shadow-[0_0_10px_hsl(var(--warning)/0.3)]";
 }
 
-export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256 }: Props) {
+export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256, enableWebSearch, outputLang }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
 
@@ -31,7 +34,7 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between p-3 bg-muted/50 hover:bg-muted transition-colors cursor-pointer select-none text-left"
       >
-        <div className="flex gap-2.5 items-baseline min-w-0">
+        <div className="flex gap-2.5 items-baseline min-w-0 flex-wrap">
           <span className="text-foreground/90 font-bold truncate max-w-[500px]" title={fileName}>
             {fileName}
           </span>
@@ -42,6 +45,16 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
             <span className="text-[10px] font-mono text-muted-foreground/60 whitespace-nowrap" title={ruleSha256 || ""}>
               rule: {ruleVersionId}
             </span>
+          )}
+          {outputLang !== undefined && (
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5">
+              {t("judge.badgeLang")}: {outputLang.toUpperCase()}
+            </Badge>
+          )}
+          {enableWebSearch !== undefined && (
+            <Badge variant={enableWebSearch ? "default" : "secondary"} className="text-[10px] py-0 px-1.5">
+              {t("judge.badgeSearch")}: {enableWebSearch ? t("judge.on") : t("judge.off")}
+            </Badge>
           )}
         </div>
         <div className={`px-2.5 py-0.5 text-sm font-bold border whitespace-nowrap ${scorePillClass(avgScore)}`}>
@@ -66,11 +79,13 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
                     </span>
                   )}
                 </div>
-                <div className="p-3.5 bg-background border border-border border-t-0 overflow-x-auto text-sm text-foreground/80 leading-relaxed prose prose-sm prose-invert max-w-none prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground/80">
+                <div className="p-3.5 bg-background border border-border border-t-0 overflow-x-auto text-sm text-foreground/80 leading-relaxed max-w-none whitespace-pre-wrap break-words">
                   {report.error ? (
                     <span className="text-destructive">ERROR: {report.error}</span>
                   ) : (
-                    <ReactMarkdown>{report.content}</ReactMarkdown>
+                    <ReactMarkdown className="prose prose-sm prose-invert max-w-none prose-headings:text-foreground prose-strong:text-foreground prose-li:text-foreground/80">
+                      {report.content}
+                    </ReactMarkdown>
                   )}
                 </div>
               </div>
