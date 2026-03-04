@@ -55,6 +55,7 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
               <th className="p-3 text-left text-foreground/80">{t("ranking.projectDoc")}</th>
               <th className="p-3 text-left text-foreground/80 w-36">{t("ranking.survivalRate")}</th>
               <th className="p-3 text-left text-foreground/80 w-32">{t("ranking.ruleVersion")}</th>
+              <th className="p-3 text-left text-foreground/80 w-24">{t("ranking.competitorSearch")}</th>
               <th className="p-3 text-left text-foreground/80 w-48">{t("ranking.timestamp")}</th>
             </tr>
           </thead>
