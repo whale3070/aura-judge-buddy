@@ -118,11 +118,29 @@ export function fetchFilesAPI(): Promise<string[]> {
   return request<string[]>("/api/files");
 }
 
-export function submitAuditAPI(targetFile: string, customPrompt: string, selectedModels: string[]): Promise<SavedResult> {
-  return request<SavedResult>("/api/audit", {
-    method: "POST",
-    body: { target_file: targetFile, custom_prompt: customPrompt, selected_models: selectedModels },
-  });
+export interface AuditOptions {
+  target_file: string;
+  custom_prompt: string;
+  selected_models: string[];
+  output_lang?: "en" | "zh";
+  enable_web_search?: boolean;
+  project_keywords?: string[];
+}
+
+export function submitAuditAPI(opts: AuditOptions): Promise<SavedResult> {
+  const body: Record<string, any> = {
+    target_file: opts.target_file,
+    custom_prompt: opts.custom_prompt,
+    selected_models: opts.selected_models,
+    output_lang: opts.output_lang ?? "en",
+  };
+  if (opts.enable_web_search) {
+    body.enable_web_search = true;
+    if (opts.project_keywords?.length) {
+      body.project_keywords = opts.project_keywords;
+    }
+  }
+  return request<SavedResult>("/api/audit", { method: "POST", body });
 }
 
 export function fetchRankingsAPI(): Promise<SavedResult[]> {
