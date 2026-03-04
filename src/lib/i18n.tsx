@@ -276,6 +276,19 @@ const translations = {
   "rules.uploadSuccess": { zh: "上传成功", en: "Upload successful" },
   "rules.noVersions": { zh: "暂无版本记录", en: "No versions yet" },
   "ranking.ruleVersion": { zh: "规则版本", en: "Rule Version" },
+
+  // Judge - competitor search & output lang
+  "judge.competitorSearch": { zh: "竞品搜索", en: "Competitor Search" },
+  "judge.competitorKeywords": { zh: "竞品关键词", en: "Competitor Keywords" },
+  "judge.keywordsPlaceholder": { zh: "GoPlus, token security API, rug pull detection...", en: "GoPlus, token security API, rug pull detection..." },
+  "judge.addCommonKeywords": { zh: "添加常用关键词", en: "Add common keywords" },
+  "judge.outputLang": { zh: "输出语言", en: "Output Language" },
+  "judge.langEn": { zh: "English", en: "English" },
+  "judge.langZh": { zh: "中文", en: "中文" },
+  "judge.badgeLang": { zh: "语言", en: "Language" },
+  "judge.badgeSearch": { zh: "竞品搜索", en: "Competitor Search" },
+  "judge.on": { zh: "开", en: "ON" },
+  "judge.off": { zh: "关", en: "OFF" },
 } as const;
 
 export type TransKey = string & keyof typeof translations;

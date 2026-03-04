@@ -19,6 +19,11 @@ import ModelSelector from "@/components/ModelSelector";
 import BatchControls from "@/components/BatchControls";
 import ReportCard from "@/components/ReportCard";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+
+const COMMON_KEYWORDS = ["GoPlus","token security API","rug pull detection","address scan","contract risk scoring","honeypot detection","token risk API","address risk API"];
 
 interface ReportEntry {
   id: string;
@@ -30,6 +35,8 @@ interface ReportEntry {
   open: boolean;
   ruleVersionId?: string;
   ruleSha256?: string;
+  enableWebSearch?: boolean;
+  outputLang?: "en" | "zh";
 }
 
 function extractAvgScore(reports: AuditReport[]): number | null {
@@ -57,6 +64,10 @@ export default function Index() {
   const [delayMs, setDelayMs] = useState(200);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [adminHash, setAdminHash] = useState<string | null>(null);
+  const [enableWebSearch, setEnableWebSearch] = useState(true);
+  const [projectKeywords, setProjectKeywords] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
+  const [outputLang, setOutputLang] = useState<"en" | "zh">("en");
 
   const loadData = useCallback(async () => {
     const [f, r, t] = await Promise.all([
@@ -94,7 +105,14 @@ export default function Index() {
     const id = crypto.randomUUID();
     addReport({ id, fileName: selectedFile, avgScore: null, statusText: "RUNNING", reports: [], open: true });
     try {
-      const data = await submitAuditAPI(selectedFile, prompt, selectedModels);
+      const data = await submitAuditAPI({
+        target_file: selectedFile,
+        custom_prompt: prompt,
+        selected_models: selectedModels,
+        output_lang: outputLang,
+        enable_web_search: enableWebSearch || undefined,
+        project_keywords: enableWebSearch ? projectKeywords : undefined,
+      });
       const avg = extractAvgScore(data.reports);
       removeReport(id);
       addReport({
@@ -106,6 +124,8 @@ export default function Index() {
         open: true,
         ruleVersionId: data.rule_version_id,
         ruleSha256: data.rule_sha256,
+        enableWebSearch,
+        outputLang,
       });
       const r = await fetchRankingsAPI();
       setRankings(r);
@@ -146,7 +166,14 @@ export default function Index() {
         const placeholderId = crypto.randomUUID();
         addReport({ id: placeholderId, fileName: file, avgScore: null, statusText: `WORKER#${workerId} RUNNING`, reports: [], open: false });
         try {
-          const data = await submitAuditAPI(file, prompt, selectedModels);
+          const data = await submitAuditAPI({
+            target_file: file,
+            custom_prompt: prompt,
+            selected_models: selectedModels,
+            output_lang: outputLang,
+            enable_web_search: enableWebSearch || undefined,
+            project_keywords: enableWebSearch ? projectKeywords : undefined,
+          });
           const avg = extractAvgScore(data.reports);
           removeReport(placeholderId);
           addReport({
@@ -244,6 +271,62 @@ export default function Index() {
         <PromptEditor value={prompt} onChange={setPrompt} />
         <ModelSelector selected={selectedModels} onChange={setSelectedModels} />
 
+        {/* Competitor Search + Output Language */}
+        <div className="border border-border p-4 mb-4 bg-muted/30 space-y-4">
+          <div className="flex items-center gap-3">
+            <Switch id="web-search" checked={enableWebSearch} onCheckedChange={setEnableWebSearch} />
+            <Label htmlFor="web-search" className="text-sm font-bold text-foreground/90">
+              {t("judge.competitorSearch")}
+            </Label>
+          </div>
+          {enableWebSearch && (
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">{t("judge.competitorKeywords")}</Label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {projectKeywords.map((kw, i) => (
+                  <Badge key={i} variant="secondary" className="cursor-pointer" onClick={() => setProjectKeywords(prev => prev.filter((_, j) => j !== i))}>
+                    {kw} ✕
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 bg-background border border-border px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
+                  placeholder={t("judge.keywordsPlaceholder")}
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && keywordInput.trim()) {
+                      e.preventDefault();
+                      const newKws = keywordInput.split(",").map(s => s.trim()).filter(Boolean);
+                      setProjectKeywords(prev => [...new Set([...prev, ...newKws])]);
+                      setKeywordInput("");
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setProjectKeywords(prev => [...new Set([...prev, ...COMMON_KEYWORDS])])}
+                  className="text-xs border border-primary/40 px-3 py-1.5 text-primary hover:bg-primary/10 transition-colors whitespace-nowrap"
+                >
+                  {t("judge.addCommonKeywords")}
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <Label className="text-xs text-muted-foreground">{t("judge.outputLang")}:</Label>
+            <select
+              value={outputLang}
+              onChange={(e) => setOutputLang(e.target.value as "en" | "zh")}
+              className="bg-background border border-border px-2 py-1 text-sm text-foreground"
+            >
+              <option value="en">{t("judge.langEn")}</option>
+              <option value="zh">{t("judge.langZh")}</option>
+            </select>
+          </div>
+        </div>
+
         <div className="flex gap-3 mb-2">
           <button
             onClick={runSingleAudit}
@@ -296,6 +379,8 @@ export default function Index() {
                 defaultOpen={r.open}
                 ruleVersionId={r.ruleVersionId}
                 ruleSha256={r.ruleSha256}
+                enableWebSearch={r.enableWebSearch}
+                outputLang={r.outputLang}
               />
             ))
           )}
