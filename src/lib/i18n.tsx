@@ -302,6 +302,22 @@ const translations = {
   "my.pending": { zh: "评审处理中…", en: "Pending evaluation…" },
   "my.pendingNote": { zh: "AI 评审通常需要 5-10 分钟，请稍后点击刷新查看结果。", en: "AI review typically takes 5-10 minutes. Click Refresh to check for results." },
   "my.ruleVersion": { zh: "规则版本", en: "Rule Version" },
+
+  // Prompt Transparency
+  "prompt.title": { zh: "评审提示词（公开透明）", en: "Judging Prompt (Transparency)" },
+  "prompt.show": { zh: "展开提示词", en: "Show prompt" },
+  "prompt.hide": { zh: "收起提示词", en: "Hide prompt" },
+  "prompt.template": { zh: "Prompt 模板（公开）", en: "Prompt Template (Public)" },
+  "prompt.templateNote": { zh: "以下为后端构建完整 LLM 提示词的结构模板，所有参赛项目均使用相同模板。", en: "Below is the exact structure template used by the backend to build the full LLM prompt. All submissions use the same template." },
+  "prompt.copyTemplate": { zh: "复制模板", en: "Copy template" },
+  "prompt.customInstruction": { zh: "自定义评审指令（动态）", en: "Custom Instruction Used (Dynamic)" },
+  "prompt.copyInstruction": { zh: "复制指令", en: "Copy instruction" },
+  "prompt.language": { zh: "输出语言", en: "Output Language" },
+  "prompt.competitorSearch": { zh: "竞品搜索", en: "Competitor Search" },
+  "prompt.keywordsNote": { zh: "关键词列表：如提交时未提供，则使用系统默认关键词。", en: "Keywords: If not provided at submission, system default keywords are used." },
+  "prompt.ruleVersion": { zh: "生效规则版本", en: "Active Rule Version" },
+  "prompt.downloadYAML": { zh: "下载 YAML", en: "Download YAML" },
+  "prompt.noRule": { zh: "本次评审未记录规则版本。", en: "No active rule recorded for this run." },
 } as const;
 
 export type TransKey = string & keyof typeof translations;

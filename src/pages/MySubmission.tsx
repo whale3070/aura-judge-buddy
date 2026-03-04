@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchSubmissionById, fetchRankings, fetchJudgeResult, fetchFileTitles, type SubmissionItem, type RankingItem, type JudgeResult } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
+import PromptTransparency from "@/components/PromptTransparency";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -212,6 +213,19 @@ export default function MySubmission() {
             </ul>
           )}
         </section>
+        {/* Prompt Transparency Section */}
+        <PromptTransparency
+          result={(() => {
+            const firstResult = Object.values(scores)[0];
+            if (!firstResult) return null;
+            return {
+              rule_version_id: (firstResult as any).rule_version_id,
+              rule_sha256: (firstResult as any).rule_sha256,
+              search_query: (firstResult as any).search_query,
+              competitor_results_count: (firstResult as any).competitor_results_count,
+            };
+          })()}
+        />
 
         <section>
           <h2 className="text-lg font-bold text-foreground border-l-4 border-primary pl-3 mb-3">
