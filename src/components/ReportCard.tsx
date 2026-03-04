@@ -38,6 +38,11 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
           <span className="text-muted-foreground text-xs whitespace-nowrap">
             {statusText} · {new Date().toLocaleString()}
           </span>
+          {ruleVersionId && (
+            <span className="text-[10px] font-mono text-muted-foreground/60 whitespace-nowrap" title={ruleSha256 || ""}>
+              rule: {ruleVersionId}
+            </span>
+          )}
         </div>
         <div className={`px-2.5 py-0.5 text-sm font-bold border whitespace-nowrap ${scorePillClass(avgScore)}`}>
           {avgScore === null ? "N/A" : avgScore}
