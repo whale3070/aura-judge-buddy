@@ -379,6 +379,8 @@ export default function Index() {
                 defaultOpen={r.open}
                 ruleVersionId={r.ruleVersionId}
                 ruleSha256={r.ruleSha256}
+                enableWebSearch={r.enableWebSearch}
+                outputLang={r.outputLang}
               />
             ))
           )}
