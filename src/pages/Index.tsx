@@ -128,6 +128,8 @@ export default function Index() {
         ruleSha256: data.rule_sha256,
         enableWebSearch,
         outputLang,
+        searchQuery: data.search_query,
+        competitorResultsCount: data.competitor_results_count,
       });
       const r = await fetchRankingsAPI();
       setRankings(r);
