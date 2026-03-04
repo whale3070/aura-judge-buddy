@@ -10,6 +10,9 @@ import Admin from "./pages/Admin";
 import Ranking from "./pages/Ranking";
 import Landing from "./pages/Landing";
 import MySubmission from "./pages/MySubmission";
+import RoundList from "./pages/RoundList";
+import RoundForm from "./pages/RoundForm";
+import RoundDetail from "./pages/RoundDetail";
 import NotFound from "./pages/NotFound";
 
 function AdminHashRedirect() {
@@ -38,6 +41,10 @@ const App = () => (
             <Route path="/ranking" element={<Ranking />} />
             <Route path="/my-submission/:id" element={<MySubmission />} />
             <Route path="/judge" element={<Index />} />
+            <Route path="/rounds" element={<RoundList />} />
+            <Route path="/rounds/new" element={<RoundForm />} />
+            <Route path="/rounds/:id" element={<RoundDetail />} />
+            <Route path="/rounds/:id/edit" element={<RoundForm />} />
             <Route path="/admin/:hash" element={<AdminHashRedirect />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
