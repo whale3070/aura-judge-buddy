@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
-  fetchFiles,
-  submitAudit,
-  fetchRankings,
-  fetchAdminConfig,
-  fetchFileTitles,
+  fetchFilesAPI,
+  submitAuditAPI,
+  fetchRankingsAPI,
+  fetchAdminConfigAPI,
+  fetchFileTitlesAPI,
   type AuditReport,
-  type RankingItem,
-} from "@/lib/api";
+  type SavedResult,
+} from "@/lib/apiClient";
 import JudgeDetail from "@/components/JudgeDetail";
 import { JUDGE_PROMPT } from "@/lib/prompts";
 import RankingTable from "@/components/RankingTable";
@@ -28,6 +28,8 @@ interface ReportEntry {
   reports: AuditReport[];
   error?: string;
   open: boolean;
+  ruleVersionId?: string;
+  ruleSha256?: string;
 }
 
 function extractAvgScore(reports: AuditReport[]): number | null {
@@ -43,7 +45,7 @@ export default function Index() {
   const [selectedFile, setSelectedFile] = useState("");
   const [prompt, setPrompt] = useState(JUDGE_PROMPT);
   const [selectedModels, setSelectedModels] = useState(["deepseek", "doubao"]);
-  const [rankings, setRankings] = useState<RankingItem[]>([]);
+  const [rankings, setRankings] = useState<SavedResult[]>([]);
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
   const [rankingsLoading, setRankingsLoading] = useState(true);
   const [reports, setReports] = useState<ReportEntry[]>([]);
@@ -58,9 +60,9 @@ export default function Index() {
 
   const loadData = useCallback(async () => {
     const [f, r, t] = await Promise.all([
-      fetchFiles().catch(() => []),
-      fetchRankings().catch(() => []),
-      fetchFileTitles().catch(() => ({} as Record<string, string>)),
+      fetchFilesAPI().catch(() => []),
+      fetchRankingsAPI().catch(() => []),
+      fetchFileTitlesAPI().catch(() => ({} as Record<string, string>)),
     ]);
     setFiles(f);
     if (f.length > 0) setSelectedFile(f[0]);
@@ -73,7 +75,7 @@ export default function Index() {
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    fetchAdminConfig()
+    fetchAdminConfigAPI()
       .then((cfg) => setAdminHash(cfg.admin_hash ?? ""))
       .catch(() => setAdminHash(""));
   }, []);
@@ -92,11 +94,20 @@ export default function Index() {
     const id = crypto.randomUUID();
     addReport({ id, fileName: selectedFile, avgScore: null, statusText: "RUNNING", reports: [], open: true });
     try {
-      const data = await submitAudit(selectedFile, prompt, selectedModels);
+      const data = await submitAuditAPI(selectedFile, prompt, selectedModels);
       const avg = extractAvgScore(data.reports);
       removeReport(id);
-      addReport({ id: crypto.randomUUID(), fileName: selectedFile, avgScore: avg, statusText: "SINGLE_OK", reports: data.reports, open: true });
-      const r = await fetchRankings();
+      addReport({
+        id: crypto.randomUUID(),
+        fileName: selectedFile,
+        avgScore: avg,
+        statusText: "SINGLE_OK",
+        reports: data.reports,
+        open: true,
+        ruleVersionId: data.rule_version_id,
+        ruleSha256: data.rule_sha256,
+      });
+      const r = await fetchRankingsAPI();
       setRankings(r);
     } catch (err: any) {
       removeReport(id);
@@ -110,10 +121,10 @@ export default function Index() {
     batchStopRef.current = false;
     setBatchRunning(true);
     let allFiles: string[] = [];
-    try { allFiles = await fetchFiles(); } catch { setBatchRunning(false); return; }
+    try { allFiles = await fetchFilesAPI(); } catch { setBatchRunning(false); return; }
     let analyzed = new Set<string>();
     try {
-      const r = await fetchRankings();
+      const r = await fetchRankingsAPI();
       setRankings(r);
       analyzed = new Set(r.map((x) => x.file_name));
     } catch { /* continue */ }
@@ -135,10 +146,19 @@ export default function Index() {
         const placeholderId = crypto.randomUUID();
         addReport({ id: placeholderId, fileName: file, avgScore: null, statusText: `WORKER#${workerId} RUNNING`, reports: [], open: false });
         try {
-          const data = await submitAudit(file, prompt, selectedModels);
+          const data = await submitAuditAPI(file, prompt, selectedModels);
           const avg = extractAvgScore(data.reports);
           removeReport(placeholderId);
-          addReport({ id: crypto.randomUUID(), fileName: file, avgScore: avg, statusText: `WORKER#${workerId} OK`, reports: data.reports, open: false });
+          addReport({
+            id: crypto.randomUUID(),
+            fileName: file,
+            avgScore: avg,
+            statusText: `WORKER#${workerId} OK`,
+            reports: data.reports,
+            open: false,
+            ruleVersionId: data.rule_version_id,
+            ruleSha256: data.rule_sha256,
+          });
         } catch (err: any) {
           removeReport(placeholderId);
           addReport({ id: crypto.randomUUID(), fileName: file, avgScore: null, statusText: `WORKER#${workerId} FAIL`, reports: [], error: err.message, open: false });
@@ -146,7 +166,7 @@ export default function Index() {
         done++;
         setProgress({ done, total });
         if (done % 3 === 0 || done === total) {
-          try { const r = await fetchRankings(); setRankings(r); } catch { /* */ }
+          try { const r = await fetchRankingsAPI(); setRankings(r); } catch { /* */ }
         }
         if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
       }
@@ -161,8 +181,17 @@ export default function Index() {
       reports: [],
       open: false,
     });
-    try { const r = await fetchRankings(); setRankings(r); } catch { /* */ }
+    try { const r = await fetchRankingsAPI(); setRankings(r); } catch { /* */ }
   };
+
+  // Convert SavedResult[] to RankingItem-like for RankingTable
+  const rankingItems = rankings.map(r => ({
+    file_name: r.file_name,
+    avg_score: r.avg_score,
+    timestamp: r.timestamp,
+    rule_version_id: r.rule_version_id,
+    rule_sha256: r.rule_sha256,
+  }));
 
   return (
     <div className="min-h-screen bg-background p-5 relative overflow-hidden">
@@ -200,7 +229,7 @@ export default function Index() {
         <ActiveRulePanel />
 
         <RankingTable
-          rankings={rankings}
+          rankings={rankingItems}
           loading={rankingsLoading}
           selectedFile={selectedRankingFile ?? undefined}
           onSelect={(f) => setSelectedRankingFile(f === selectedRankingFile ? null : f)}
@@ -265,6 +294,8 @@ export default function Index() {
                 reports={r.reports}
                 error={r.error}
                 defaultOpen={r.open}
+                ruleVersionId={r.ruleVersionId}
+                ruleSha256={r.ruleSha256}
               />
             ))
           )}

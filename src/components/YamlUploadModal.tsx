@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
-import { parseAndValidateYAML, uploadRules, type ValidationResult, type RuleSet } from "@/lib/rulesApi";
+import { parseAndValidateYAML, type ValidationResult, type RuleSet } from "@/lib/rulesApi";
+import { uploadRulesAPI } from "@/lib/apiClient";
+import { toast } from "sonner";
 
 interface Props {
   onClose: () => void;
@@ -54,11 +56,14 @@ export default function YamlUploadModal({ onClose, onUploaded }: Props) {
     if (!validation?.valid) return;
     setSaving(true);
     try {
-      const result = await uploadRules(rawYAML);
-      if (result.validation.valid) {
-        onUploaded();
+      await uploadRulesAPI(rawYAML);
+      toast.success(t("rules.uploadSuccess"));
+      onUploaded();
+    } catch (e: any) {
+      if (e.message === "ADMIN_WALLET_REQUIRED") {
+        toast.error(t("rules.walletRequired"));
       } else {
-        setValidation(result.validation);
+        toast.error(e.message);
       }
     } finally {
       setSaving(false);

@@ -1,20 +1,28 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { fetchRankings, fetchFileTitles, type RankingItem } from "@/lib/api";
+import { fetchRankingsAPI, fetchFileTitlesAPI, type SavedResult } from "@/lib/apiClient";
 import RankingTable from "@/components/RankingTable";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 
 export default function Ranking() {
   const { t } = useI18n();
-  const [rankings, setRankings] = useState<RankingItem[]>([]);
+  const [rankings, setRankings] = useState<SavedResult[]>([]);
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([fetchRankings(), fetchFileTitles()])
+    Promise.all([fetchRankingsAPI(), fetchFileTitlesAPI()])
       .then(([r, t]) => { setRankings(r); setTitleMap(t); })
       .finally(() => setLoading(false));
   }, []);
+
+  const rankingItems = rankings.map(r => ({
+    file_name: r.file_name,
+    avg_score: r.avg_score,
+    timestamp: r.timestamp,
+    rule_version_id: r.rule_version_id,
+    rule_sha256: r.rule_sha256,
+  }));
 
   return (
     <div className="min-h-screen bg-background p-5 relative overflow-hidden">
@@ -34,7 +42,7 @@ export default function Ranking() {
         <p className="text-center text-xs text-muted-foreground mb-4">
           {t("ranking.note")}
         </p>
-        <RankingTable rankings={rankings} loading={loading} titleMap={titleMap} />
+        <RankingTable rankings={rankingItems} loading={loading} titleMap={titleMap} />
       </div>
     </div>
   );
