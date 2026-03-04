@@ -17,6 +17,7 @@ interface Props {
   outputLang?: "en" | "zh";
   searchQuery?: string;
   competitorResultsCount?: number;
+  projectKeywords?: string[];
 }
 
 function scorePillClass(avg: number | null) {
