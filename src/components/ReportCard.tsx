@@ -15,6 +15,8 @@ interface Props {
   ruleSha256?: string;
   enableWebSearch?: boolean;
   outputLang?: "en" | "zh";
+  searchQuery?: string;
+  competitorResultsCount?: number;
 }
 
 function scorePillClass(avg: number | null) {
