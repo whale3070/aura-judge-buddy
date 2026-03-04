@@ -343,6 +343,9 @@ export default function Index() {
           </div>
         </div>
 
+        <p className="text-xs text-muted-foreground mb-2 border-l-2 border-primary/40 pl-2">
+          {t("judge.rubricNote")}
+        </p>
         <div className="flex gap-3 mb-2">
           <button
             onClick={runSingleAudit}

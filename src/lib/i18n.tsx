@@ -128,11 +128,14 @@ const translations = {
   "fileSelector.note": { zh: "单文件裁决仍可用；批量裁决会自动处理", en: "Single file judging still available; batch will auto-process" },
   "fileSelector.noteDir": { zh: "下全部未分析文件。", en: "all unanalyzed files." },
 
-  // PromptEditor
-  "promptEditor.label": { zh: "2. 注入审计指令 (Audit Command Injection)", en: "2. Audit Command Injection" },
-
   // ModelSelector
-  "modelSelector.label": { zh: "3. 召唤裁决官 (Consulting LLM Clusters)", en: "3. Select LLM Judges" },
+  "modelSelector.label": { zh: "2. 召唤裁决官 (Consulting LLM Clusters)", en: "2. Select LLM Judges" },
+
+  // Custom prompt & rubric
+  "judge.customPromptLabel": { zh: "3. 自定义指令（可选）", en: "3. Custom Instruction (Optional)" },
+  "judge.customPromptPlaceholder": { zh: "严格按照当前生效规则评分，并重点关注创新性与已有解决方案的差异。", en: "Score strictly based on ACTIVE JUDGING RULES. Pay special attention to novelty vs existing solutions." },
+  "judge.customPromptHint": { zh: "留空则使用默认指令。评分依据以当前生效 YAML 规则为准。", en: "Leave empty to use default instruction. Scoring is based on the active YAML rules." },
+  "judge.rubricNote": { zh: "📋 评分依据：当前生效规则（YAML）", en: "📋 Rubric: Active Judging Rules (YAML)" },
 
   // BatchControls
   "batch.dirFilter": { zh: "目录过滤：", en: "Dir filter:" },
