@@ -404,6 +404,7 @@ export default function Index() {
                 outputLang={r.outputLang}
                 searchQuery={r.searchQuery}
                 competitorResultsCount={r.competitorResultsCount}
+                projectKeywords={r.projectKeywords}
               />
             ))
           )}
