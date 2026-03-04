@@ -10,11 +10,9 @@ import {
   type SavedResult,
 } from "@/lib/apiClient";
 import JudgeDetail from "@/components/JudgeDetail";
-import { JUDGE_PROMPT } from "@/lib/prompts";
 import RankingTable from "@/components/RankingTable";
 import ActiveRulePanel from "@/components/ActiveRulePanel";
 import FileSelector from "@/components/FileSelector";
-import PromptEditor from "@/components/PromptEditor";
 import ModelSelector from "@/components/ModelSelector";
 import BatchControls from "@/components/BatchControls";
 import ReportCard from "@/components/ReportCard";
