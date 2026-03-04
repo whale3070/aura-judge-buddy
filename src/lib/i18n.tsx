@@ -318,6 +318,16 @@ const translations = {
   "prompt.ruleVersion": { zh: "生效规则版本", en: "Active Rule Version" },
   "prompt.downloadYAML": { zh: "下载 YAML", en: "Download YAML" },
   "prompt.noRule": { zh: "本次评审未记录规则版本。", en: "No active rule recorded for this run." },
+  "prompt.thisRun": { zh: "本次评审（实际参数）", en: "This Run (Actual Values)" },
+  "prompt.modelsUsed": { zh: "使用模型", en: "Models Used" },
+  "prompt.unknown": { zh: "未知", en: "Unknown" },
+  "prompt.ruleNotRecorded": { zh: "旧评审结果未记录规则版本。", en: "Rule version was not recorded for this older evaluation run." },
+  "prompt.competitorNotAvailable": { zh: "本次评审未包含竞品检索元数据。", en: "Competitor search metadata is not available for this run." },
+  "prompt.queryNotRecorded": { zh: "（查询未记录）", en: "(query not recorded)" },
+  "prompt.copyQuery": { zh: "复制查询", en: "Copy query" },
+  "prompt.langUnknown": { zh: "未记录输出语言；以模型输出内容为准。", en: "Language was not recorded; report content reflects the model output." },
+  "prompt.instructionFallbackLabel": { zh: "默认指令（兜底）", en: "Default instruction (fallback)" },
+  "prompt.instructionFallbackNote": { zh: "后端当前未持久化每次评审的 custom_prompt，这里显示兜底文本。", en: "The backend does not currently persist per-run custom_prompt; showing fallback." },
 } as const;
 
 export type TransKey = string & keyof typeof translations;
