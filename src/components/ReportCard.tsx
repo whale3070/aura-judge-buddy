@@ -1,6 +1,6 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
-import type { AuditReport } from "@/lib/api";
+import type { AuditReport } from "@/lib/apiClient";
 import { useI18n } from "@/lib/i18n";
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   reports: AuditReport[];
   error?: string;
   defaultOpen?: boolean;
+  ruleVersionId?: string;
+  ruleSha256?: string;
 }
 
 function scorePillClass(avg: number | null) {
@@ -19,7 +21,7 @@ function scorePillClass(avg: number | null) {
   return "bg-warning text-warning-foreground border-warning/40 shadow-[0_0_10px_hsl(var(--warning)/0.3)]";
 }
 
-export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false }: Props) {
+export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256 }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
 
@@ -36,6 +38,11 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
           <span className="text-muted-foreground text-xs whitespace-nowrap">
             {statusText} · {new Date().toLocaleString()}
           </span>
+          {ruleVersionId && (
+            <span className="text-[10px] font-mono text-muted-foreground/60 whitespace-nowrap" title={ruleSha256 || ""}>
+              rule: {ruleVersionId}
+            </span>
+          )}
         </div>
         <div className={`px-2.5 py-0.5 text-sm font-bold border whitespace-nowrap ${scorePillClass(avgScore)}`}>
           {avgScore === null ? "N/A" : avgScore}

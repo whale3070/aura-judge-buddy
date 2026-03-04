@@ -267,6 +267,15 @@ const translations = {
   "rules.mockAIScore": { zh: "模拟 AI 评分", en: "Mock AI Score" },
   "rules.aiScoreResult": { zh: "AI 评分结果（模拟）", en: "AI Score Result (Mock)" },
   "rules.aiWeightedScore": { zh: "加权总分", en: "Weighted Score" },
+  "rules.adminWallet": { zh: "管理员钱包地址", en: "Admin Wallet" },
+  "rules.saveWallet": { zh: "保存", en: "Save" },
+  "rules.walletSaved": { zh: "钱包地址已保存", en: "Wallet address saved" },
+  "rules.walletRequired": { zh: "请先设置管理员钱包地址", en: "Please set admin wallet address first" },
+  "rules.activated": { zh: "已激活", en: "Activated" },
+  "rules.deleted": { zh: "已删除", en: "Deleted" },
+  "rules.uploadSuccess": { zh: "上传成功", en: "Upload successful" },
+  "rules.noVersions": { zh: "暂无版本记录", en: "No versions yet" },
+  "ranking.ruleVersion": { zh: "规则版本", en: "Rule Version" },
 } as const;
 
 export type TransKey = string & keyof typeof translations;
