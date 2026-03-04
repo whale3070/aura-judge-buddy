@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchSubmissionById, fetchRankings, fetchJudgeResult, fetchFileTitles, type SubmissionItem, type RankingItem, type JudgeResult } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function MySubmission() {
   const { t } = useI18n();
@@ -15,7 +17,7 @@ export default function MySubmission() {
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     if (!id) return;
     setLoading(true);
     Promise.all([fetchSubmissionById(id), fetchRankings(), fetchFileTitles()])
@@ -27,7 +29,9 @@ export default function MySubmission() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => {
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const loadScores = useCallback(() => {
     if (!submission?.md_files?.length) return;
     setScoresLoading(true);
     const promises = submission.md_files.map((file) =>
@@ -40,7 +44,11 @@ export default function MySubmission() {
     }).finally(() => setScoresLoading(false));
   }, [submission?.id, submission?.md_files?.length]);
 
+  useEffect(() => { loadScores(); }, [loadScores]);
+
   const myFileSet = new Set(submission?.md_files ?? []);
+  const hasAnyScore = Object.keys(scores).length > 0;
+  const isPending = submission && submission.md_files?.length > 0 && !hasAnyScore && !scoresLoading;
 
   if (loading) {
     return (
@@ -87,11 +95,26 @@ export default function MySubmission() {
         </div>
 
         <section className="mb-8">
-          <h2 className="text-lg font-bold text-foreground border-l-4 border-primary pl-3 mb-3">
-            {t("my.aiScores")}
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-foreground border-l-4 border-primary pl-3">
+              {t("my.aiScores")}
+            </h2>
+            <button
+              type="button"
+              onClick={() => { loadData(); loadScores(); }}
+              className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+            >
+              🔄 {t("my.refresh")}
+            </button>
+          </div>
+
           {scoresLoading ? (
             <p className="text-sm text-muted-foreground">{t("my.loadingScores")}</p>
+          ) : isPending ? (
+            <div className="p-6 border border-border bg-muted/20 rounded text-center">
+              <p className="text-sm text-muted-foreground mb-2">⏳ {t("my.pending")}</p>
+              <p className="text-xs text-muted-foreground">{t("my.pendingNote")}</p>
+            </div>
           ) : submission.md_files?.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("my.noFiles")}</p>
           ) : (
@@ -110,6 +133,51 @@ export default function MySubmission() {
                         <span className="text-xs text-muted-foreground">{t("my.noScore")}</span>
                       )}
                     </div>
+
+                    {/* Metadata badges */}
+                    {result && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {(result as any).rule_version_id && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {t("my.ruleVersion")}: {((result as any).rule_version_id as string).slice(0, 8)}
+                          </Badge>
+                        )}
+                        {(result as any).rule_sha256 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-[10px] cursor-help">
+                                SHA256
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="font-mono text-[10px] break-all">{(result as any).rule_sha256}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {(result as any).competitor_results_count != null ? (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {t("judge.competitorSearch")}: {t("judge.on")} ({(result as any).competitor_results_count})
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">
+                            {t("judge.competitorSearch")}: {t("judge.off")}
+                          </Badge>
+                        )}
+                        {(result as any).search_query && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-[10px] cursor-help">
+                                🔍 {t("judge.searchQuery")}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-sm">
+                              <p className="text-xs">{(result as any).search_query}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    )}
+
                     {result && (
                       <button
                         type="button"
@@ -122,9 +190,18 @@ export default function MySubmission() {
                     {selectedFile === file && result && (
                       <div className="mt-3 pt-3 border-t border-border">
                         {result.reports?.map((r, i) => (
-                          <div key={i} className="mb-2">
-                            <span className="text-xs font-semibold text-muted-foreground">{r.model_name}</span>
-                            <p className="text-xs text-foreground/80 whitespace-pre-wrap mt-1">{r.content}</p>
+                          <div key={i} className="mb-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold text-muted-foreground">{r.model_name}</span>
+                              {r.score != null && (
+                                <Badge variant="outline" className="text-[10px]">
+                                  {r.score}
+                                </Badge>
+                              )}
+                            </div>
+                            <pre className="text-xs text-foreground/80 whitespace-pre-wrap break-words bg-muted/30 p-3 border border-border rounded font-sans leading-relaxed">
+                              {r.content}
+                            </pre>
                           </div>
                         ))}
                       </div>

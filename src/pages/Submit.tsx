@@ -1,7 +1,10 @@
 import { useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
+import { MODELS } from "@/lib/prompts";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 
 interface SubmissionForm {
   project_title: string;
@@ -27,13 +30,32 @@ const EMPTY_FORM: SubmissionForm = {
 
 const ACCEPTED_EXTENSIONS = [".md", ".txt", ".html", ".pdf"];
 
+const COMMON_KEYWORDS = [
+  "GoPlus", "token security API", "rug pull detection", "address scan",
+  "contract risk scoring", "honeypot detection", "token risk API", "address risk API",
+];
+
+const DEFAULT_SUBMIT_PROMPT = "Score strictly based on rules. Pay special attention to novelty vs existing solutions.";
+
 export default function Submit() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [form, setForm] = useState<SubmissionForm>(EMPTY_FORM);
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [lastSubmissionId, setLastSubmissionId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Advanced fields
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [outputLang, setOutputLang] = useState<"en" | "zh">("en");
+  const [enableWebSearch, setEnableWebSearch] = useState(true);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
+  const [selectedModels, setSelectedModels] = useState<string[]>(
+    MODELS.filter((m) => m.defaultChecked).map((m) => m.id)
+  );
+  const [customPrompt, setCustomPrompt] = useState(DEFAULT_SUBMIT_PROMPT);
 
   const set = (field: keyof SubmissionForm) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -54,6 +76,39 @@ export default function Submit() {
 
   const removeFile = (idx: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const addKeyword = (kw: string) => {
+    const trimmed = kw.trim();
+    if (trimmed && !keywords.includes(trimmed)) {
+      setKeywords((prev) => [...prev, trimmed]);
+    }
+  };
+
+  const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addKeyword(keywordInput);
+      setKeywordInput("");
+    }
+  };
+
+  const removeKeyword = (kw: string) => {
+    setKeywords((prev) => prev.filter((k) => k !== kw));
+  };
+
+  const addCommonKeywords = () => {
+    setKeywords((prev) => {
+      const set = new Set(prev);
+      COMMON_KEYWORDS.forEach((k) => set.add(k));
+      return Array.from(set);
+    });
+  };
+
+  const toggleModel = (id: string) => {
+    setSelectedModels((prev) =>
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
+    );
   };
 
   const validate = (): string | null => {
@@ -83,6 +138,17 @@ export default function Submit() {
     });
     files.forEach((f) => fd.append("files", f));
 
+    // Advanced fields (backward compatible - backend ignores unknown fields)
+    fd.append("output_lang", outputLang);
+    fd.append("custom_prompt", customPrompt);
+    fd.append("selected_models", JSON.stringify(selectedModels));
+    if (enableWebSearch) {
+      fd.append("enable_web_search", "true");
+      if (keywords.length > 0) {
+        fd.append("project_keywords", JSON.stringify(keywords));
+      }
+    }
+
     try {
       const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
       const res = await fetch(`https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy/api/submit`, {
@@ -96,6 +162,9 @@ export default function Submit() {
       setFiles([]);
       setLastSubmissionId(submissionId ?? null);
       toast.success(t("submit.submitSuccess"));
+      if (submissionId) {
+        navigate(`/my-submission/${submissionId}`);
+      }
     } catch {
       toast.error(t("submit.submitFail"));
     }
@@ -111,10 +180,7 @@ export default function Submit() {
       <div className="max-w-[800px] mx-auto border border-primary/40 p-8 shadow-[0_0_30px_hsl(var(--primary)/0.1)] bg-card relative">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
           <div className="flex items-center gap-2">
-            <Link
-              to="/submit"
-              className="text-xs text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-1.5"
-            >
+            <Link to="/submit" className="text-xs text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-1.5">
               {t("nav.home")}
             </Link>
             <LanguageToggle />
@@ -216,6 +282,124 @@ export default function Submit() {
                   <button onClick={() => removeFile(i)} className="text-destructive hover:text-destructive/80 shrink-0">✕</button>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Advanced Settings */}
+        <div className="mt-6 mb-4">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-xs text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-1.5 flex items-center gap-1.5"
+          >
+            <span className={`transition-transform inline-block ${showAdvanced ? "rotate-90" : ""}`}>▶</span>
+            {t("submit.advanced")}
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-4 p-4 border border-border bg-muted/30 space-y-5">
+              {/* Output Language */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground/80 mb-2">
+                  {t("judge.outputLang")}
+                </label>
+                <div className="flex gap-3">
+                  {(["en", "zh"] as const).map((l) => (
+                    <button
+                      key={l}
+                      type="button"
+                      onClick={() => setOutputLang(l)}
+                      className={`px-3 py-1.5 text-xs border transition-colors ${
+                        outputLang === l
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {l === "en" ? t("judge.langEn") : t("judge.langZh")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Competitor Search Toggle */}
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <label className="text-xs font-semibold text-foreground/80">
+                    {t("judge.competitorSearch")}
+                  </label>
+                  <Switch checked={enableWebSearch} onCheckedChange={setEnableWebSearch} />
+                  <span className="text-[10px] text-muted-foreground">
+                    {enableWebSearch ? t("judge.on") : t("judge.off")}
+                  </span>
+                </div>
+
+                {enableWebSearch && (
+                  <div className="pl-1 space-y-2">
+                    <label className="block text-xs text-muted-foreground">
+                      {t("judge.competitorKeywords")}
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {keywords.map((kw) => (
+                        <Badge key={kw} variant="secondary" className="text-[10px] gap-1">
+                          {kw}
+                          <button onClick={() => removeKeyword(kw)} className="hover:text-destructive ml-0.5">✕</button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        value={keywordInput}
+                        onChange={(e) => setKeywordInput(e.target.value)}
+                        onKeyDown={handleKeywordKeyDown}
+                        placeholder={t("judge.keywordsPlaceholder")}
+                        className="field-input flex-1 text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={addCommonKeywords}
+                        className="text-[10px] border border-border px-2 py-1 text-muted-foreground hover:text-primary hover:border-primary transition-colors whitespace-nowrap"
+                      >
+                        {t("judge.addCommonKeywords")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Model Selection */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground/80 mb-2">
+                  {t("modelSelector.label")}
+                </label>
+                <div className="flex gap-4 flex-wrap">
+                  {MODELS.map((m) => (
+                    <label key={m.id} className="flex items-center gap-2 cursor-pointer text-foreground/80 text-xs hover:text-foreground transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selectedModels.includes(m.id)}
+                        onChange={() => toggleModel(m.id)}
+                        className="accent-primary w-3.5 h-3.5"
+                      />
+                      {m.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Prompt */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground/80 mb-2">
+                  {t("submit.customPrompt")}
+                </label>
+                <textarea
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  rows={3}
+                  className="field-input resize-y text-xs"
+                  placeholder={DEFAULT_SUBMIT_PROMPT}
+                />
+              </div>
             </div>
           )}
         </div>

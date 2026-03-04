@@ -292,6 +292,16 @@ const translations = {
   "judge.searchQuery": { zh: "搜索查询", en: "Search Query" },
   "judge.competitorResults": { zh: "竞品结果", en: "Competitor Results" },
   "ranking.competitorSearch": { zh: "竞品搜索", en: "Competitor Search" },
+
+  // Submit - advanced fields
+  "submit.advanced": { zh: "⚙ 高级设置 (Advanced)", en: "⚙ Advanced Settings" },
+  "submit.customPrompt": { zh: "自定义审计指令", en: "Custom Audit Prompt" },
+
+  // MySubmission - new fields
+  "my.refresh": { zh: "刷新", en: "Refresh" },
+  "my.pending": { zh: "评审处理中…", en: "Pending evaluation…" },
+  "my.pendingNote": { zh: "AI 评审通常需要 5–10 分钟，请稍后点击"刷新"查看结果。", en: "AI review typically takes 5–10 minutes. Click \"Refresh\" to check for results." },
+  "my.ruleVersion": { zh: "规则版本", en: "Rule Version" },
 } as const;
 
 export type TransKey = string & keyof typeof translations;
