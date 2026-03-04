@@ -213,6 +213,19 @@ export default function MySubmission() {
             </ul>
           )}
         </section>
+        {/* Prompt Transparency Section */}
+        <PromptTransparency
+          result={(() => {
+            const firstResult = Object.values(scores)[0];
+            if (!firstResult) return null;
+            return {
+              rule_version_id: (firstResult as any).rule_version_id,
+              rule_sha256: (firstResult as any).rule_sha256,
+              search_query: (firstResult as any).search_query,
+              competitor_results_count: (firstResult as any).competitor_results_count,
+            };
+          })()}
+        />
 
         <section>
           <h2 className="text-lg font-bold text-foreground border-l-4 border-primary pl-3 mb-3">
