@@ -23,6 +23,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 
+const COMMON_KEYWORDS = ["GoPlus","token security API","rug pull detection","address scan","contract risk scoring","honeypot detection","token risk API","address risk API"];
+
 interface ReportEntry {
   id: string;
   fileName: string;
@@ -33,6 +35,8 @@ interface ReportEntry {
   open: boolean;
   ruleVersionId?: string;
   ruleSha256?: string;
+  enableWebSearch?: boolean;
+  outputLang?: "en" | "zh";
 }
 
 function extractAvgScore(reports: AuditReport[]): number | null {
