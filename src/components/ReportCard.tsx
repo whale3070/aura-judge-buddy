@@ -68,7 +68,21 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
 
       {open && (
         <div className="p-3.5 bg-card border-t border-border">
-          {error ? (
+          {searchQuery && (
+            <div className="mb-3">
+              <button
+                onClick={() => setShowSearchQuery(!showSearchQuery)}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+              >
+                {showSearchQuery ? "▼" : "▶"} {t("judge.searchQuery")}
+              </button>
+              {showSearchQuery && (
+                <div className="mt-1 text-xs font-mono text-muted-foreground/80 bg-muted/30 border border-border p-2">
+                  {searchQuery}
+                </div>
+              )}
+            </div>
+          )}
             <div className="text-destructive font-bold">ERROR: {error}</div>
           ) : reports.length === 0 ? (
             <div className="text-muted-foreground">{t("report.waiting")}</div>
