@@ -6,6 +6,7 @@ export interface RankingItem {
   timestamp: string;
   rule_version_id?: string;
   rule_sha256?: string;
+  competitor_results_count?: number;
 }
 
 interface Props {
