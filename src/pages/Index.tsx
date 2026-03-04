@@ -271,7 +271,20 @@ export default function Index() {
         )}
 
         <FileSelector files={files} selected={selectedFile} onChange={setSelectedFile} loading={filesLoading} />
-        <PromptEditor value={prompt} onChange={setPrompt} />
+        {/* Custom prompt (optional) */}
+        <div className="mb-5">
+          <label className="block mb-2.5 font-bold text-foreground/90 text-sm border-l-[3px] border-primary pl-2.5">
+            {t("judge.customPromptLabel")}
+          </label>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={3}
+            placeholder={t("judge.customPromptPlaceholder")}
+            className="w-full bg-muted border border-border text-foreground p-4 font-mono text-sm outline-none transition-all focus:border-primary focus:shadow-[var(--matrix-glow)] resize-y placeholder:text-muted-foreground"
+          />
+          <p className="text-xs text-muted-foreground mt-1.5">{t("judge.customPromptHint")}</p>
+        </div>
         <ModelSelector selected={selectedModels} onChange={setSelectedModels} />
 
         {/* Competitor Search + Output Language */}
