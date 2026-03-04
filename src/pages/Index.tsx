@@ -50,7 +50,7 @@ export default function Index() {
   const [files, setFiles] = useState<string[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState("");
-  const [prompt, setPrompt] = useState(JUDGE_PROMPT);
+  const [prompt, setPrompt] = useState("");
   const [selectedModels, setSelectedModels] = useState(["deepseek", "doubao"]);
   const [rankings, setRankings] = useState<SavedResult[]>([]);
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
