@@ -21,7 +21,7 @@ function scorePillClass(avg: number | null) {
   return "bg-warning text-warning-foreground border-warning/40 shadow-[0_0_10px_hsl(var(--warning)/0.3)]";
 }
 
-export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false }: Props) {
+export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256 }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
 
