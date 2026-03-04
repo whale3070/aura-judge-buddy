@@ -113,6 +113,9 @@ export default function Admin() {
             <Link to="/rounds" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
               {t("nav.rounds")}
             </Link>
+            <Link to="/rules" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
+              {t("nav.rules")}
+            </Link>
             <Link to="/judge" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
               {t("nav.judge")}
             </Link>

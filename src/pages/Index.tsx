@@ -12,6 +12,7 @@ import {
 import JudgeDetail from "@/components/JudgeDetail";
 import { JUDGE_PROMPT } from "@/lib/prompts";
 import RankingTable from "@/components/RankingTable";
+import ActiveRulePanel from "@/components/ActiveRulePanel";
 import FileSelector from "@/components/FileSelector";
 import PromptEditor from "@/components/PromptEditor";
 import ModelSelector from "@/components/ModelSelector";
@@ -195,6 +196,8 @@ export default function Index() {
             {t("nav.adminPanel")}
           </Link>
         </div>
+
+        <ActiveRulePanel />
 
         <RankingTable
           rankings={rankings}
