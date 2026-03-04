@@ -10,11 +10,9 @@ import {
   type SavedResult,
 } from "@/lib/apiClient";
 import JudgeDetail from "@/components/JudgeDetail";
-import { JUDGE_PROMPT } from "@/lib/prompts";
 import RankingTable from "@/components/RankingTable";
 import ActiveRulePanel from "@/components/ActiveRulePanel";
 import FileSelector from "@/components/FileSelector";
-import PromptEditor from "@/components/PromptEditor";
 import ModelSelector from "@/components/ModelSelector";
 import BatchControls from "@/components/BatchControls";
 import ReportCard from "@/components/ReportCard";
@@ -52,7 +50,7 @@ export default function Index() {
   const [files, setFiles] = useState<string[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState("");
-  const [prompt, setPrompt] = useState(JUDGE_PROMPT);
+  const [prompt, setPrompt] = useState("");
   const [selectedModels, setSelectedModels] = useState(["deepseek", "doubao"]);
   const [rankings, setRankings] = useState<SavedResult[]>([]);
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
@@ -273,7 +271,20 @@ export default function Index() {
         )}
 
         <FileSelector files={files} selected={selectedFile} onChange={setSelectedFile} loading={filesLoading} />
-        <PromptEditor value={prompt} onChange={setPrompt} />
+        {/* Custom prompt (optional) */}
+        <div className="mb-5">
+          <label className="block mb-2.5 font-bold text-foreground/90 text-sm border-l-[3px] border-primary pl-2.5">
+            {t("judge.customPromptLabel")}
+          </label>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={3}
+            placeholder={t("judge.customPromptPlaceholder")}
+            className="w-full bg-muted border border-border text-foreground p-4 font-mono text-sm outline-none transition-all focus:border-primary focus:shadow-[var(--matrix-glow)] resize-y placeholder:text-muted-foreground"
+          />
+          <p className="text-xs text-muted-foreground mt-1.5">{t("judge.customPromptHint")}</p>
+        </div>
         <ModelSelector selected={selectedModels} onChange={setSelectedModels} />
 
         {/* Competitor Search + Output Language */}
@@ -332,6 +343,9 @@ export default function Index() {
           </div>
         </div>
 
+        <p className="text-xs text-muted-foreground mb-2 border-l-2 border-primary/40 pl-2">
+          {t("judge.rubricNote")}
+        </p>
         <div className="flex gap-3 mb-2">
           <button
             onClick={runSingleAudit}
