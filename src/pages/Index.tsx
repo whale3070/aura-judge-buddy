@@ -105,7 +105,14 @@ export default function Index() {
     const id = crypto.randomUUID();
     addReport({ id, fileName: selectedFile, avgScore: null, statusText: "RUNNING", reports: [], open: true });
     try {
-      const data = await submitAuditAPI(selectedFile, prompt, selectedModels);
+      const data = await submitAuditAPI({
+        target_file: selectedFile,
+        custom_prompt: prompt,
+        selected_models: selectedModels,
+        output_lang: outputLang,
+        enable_web_search: enableWebSearch || undefined,
+        project_keywords: enableWebSearch ? projectKeywords : undefined,
+      });
       const avg = extractAvgScore(data.reports);
       removeReport(id);
       addReport({
