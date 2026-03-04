@@ -216,11 +216,11 @@ function SubmissionsTab({
           <div className="flex items-center">
             <button
               onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-              className="flex-1 flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors"
+              className="flex-1 min-w-0 flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors"
             >
               <div className="min-w-0">
                 <div className="font-bold text-foreground/90 truncate">{s.project_title}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{s.one_liner}</div>
+                <div className="text-xs text-muted-foreground mt-0.5 truncate">{s.one_liner}</div>
               </div>
               <div className="text-xs text-muted-foreground whitespace-nowrap ml-3">
                 {new Date(s.created_at).toLocaleString()}
