@@ -65,7 +65,7 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
           {avgScore === null ? "N/A" : avgScore}
         </div>
       </button>
-          {error ? (
+
       {open && (
         <div className="p-3.5 bg-card border-t border-border">
           {searchQuery && (
@@ -83,6 +83,7 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
               )}
             </div>
           )}
+          {error ? (
             <div className="text-destructive font-bold">ERROR: {error}</div>
           ) : reports.length === 0 ? (
             <div className="text-muted-foreground">{t("report.waiting")}</div>
