@@ -222,6 +222,7 @@ export default function Index() {
     timestamp: r.timestamp,
     rule_version_id: r.rule_version_id,
     rule_sha256: r.rule_sha256,
+    competitor_results_count: r.competitor_results_count,
   }));
 
   return (
