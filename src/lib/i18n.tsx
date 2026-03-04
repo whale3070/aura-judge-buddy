@@ -300,7 +300,7 @@ const translations = {
   // MySubmission - new fields
   "my.refresh": { zh: "刷新", en: "Refresh" },
   "my.pending": { zh: "评审处理中…", en: "Pending evaluation…" },
-  "my.pendingNote": { zh: "AI 评审通常需要 5–10 分钟，请稍后点击"刷新"查看结果。", en: "AI review typically takes 5–10 minutes. Click \"Refresh\" to check for results." },
+  "my.pendingNote": { zh: "AI 评审通常需要 5-10 分钟，请稍后点击刷新查看结果。", en: "AI review typically takes 5-10 minutes. Click Refresh to check for results." },
   "my.ruleVersion": { zh: "规则版本", en: "Rule Version" },
 } as const;
 
