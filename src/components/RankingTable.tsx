@@ -101,6 +101,13 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
+                  <td className="p-3 text-xs font-mono">
+                    {item.competitor_results_count != null ? (
+                      <span className="text-primary">ON ({item.competitor_results_count})</span>
+                    ) : (
+                      <span className="text-muted-foreground">OFF</span>
+                    )}
+                  </td>
                   <td className="p-3 text-muted-foreground text-xs">{new Date(item.timestamp).toLocaleString()}</td>
                 </tr>
               ))

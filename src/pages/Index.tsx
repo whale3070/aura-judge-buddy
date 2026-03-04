@@ -386,6 +386,8 @@ export default function Index() {
                 ruleSha256={r.ruleSha256}
                 enableWebSearch={r.enableWebSearch}
                 outputLang={r.outputLang}
+                searchQuery={r.searchQuery}
+                competitorResultsCount={r.competitorResultsCount}
               />
             ))
           )}

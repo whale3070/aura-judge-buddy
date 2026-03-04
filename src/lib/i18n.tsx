@@ -289,6 +289,9 @@ const translations = {
   "judge.badgeSearch": { zh: "竞品搜索", en: "Competitor Search" },
   "judge.on": { zh: "开", en: "ON" },
   "judge.off": { zh: "关", en: "OFF" },
+  "judge.searchQuery": { zh: "搜索查询", en: "Search Query" },
+  "judge.competitorResults": { zh: "竞品结果", en: "Competitor Results" },
+  "ranking.competitorSearch": { zh: "竞品搜索", en: "Competitor Search" },
 } as const;
 
 export type TransKey = string & keyof typeof translations;
