@@ -37,6 +37,8 @@ interface ReportEntry {
   ruleSha256?: string;
   enableWebSearch?: boolean;
   outputLang?: "en" | "zh";
+  searchQuery?: string;
+  competitorResultsCount?: number;
 }
 
 function extractAvgScore(reports: AuditReport[]): number | null {
