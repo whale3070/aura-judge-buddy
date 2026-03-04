@@ -129,6 +129,7 @@ export default function Index() {
         outputLang,
         searchQuery: data.search_query,
         competitorResultsCount: data.competitor_results_count,
+        projectKeywords: enableWebSearch ? projectKeywords : undefined,
       });
       const r = await fetchRankingsAPI();
       setRankings(r);
