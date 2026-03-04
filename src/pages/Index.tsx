@@ -64,6 +64,10 @@ export default function Index() {
   const [delayMs, setDelayMs] = useState(200);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [adminHash, setAdminHash] = useState<string | null>(null);
+  const [enableWebSearch, setEnableWebSearch] = useState(true);
+  const [projectKeywords, setProjectKeywords] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
+  const [outputLang, setOutputLang] = useState<"en" | "zh">("en");
 
   const loadData = useCallback(async () => {
     const [f, r, t] = await Promise.all([
