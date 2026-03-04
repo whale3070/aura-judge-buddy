@@ -37,6 +37,8 @@ interface ReportEntry {
   ruleSha256?: string;
   enableWebSearch?: boolean;
   outputLang?: "en" | "zh";
+  searchQuery?: string;
+  competitorResultsCount?: number;
 }
 
 function extractAvgScore(reports: AuditReport[]): number | null {
@@ -126,6 +128,8 @@ export default function Index() {
         ruleSha256: data.rule_sha256,
         enableWebSearch,
         outputLang,
+        searchQuery: data.search_query,
+        competitorResultsCount: data.competitor_results_count,
       });
       const r = await fetchRankingsAPI();
       setRankings(r);
@@ -218,6 +222,7 @@ export default function Index() {
     timestamp: r.timestamp,
     rule_version_id: r.rule_version_id,
     rule_sha256: r.rule_sha256,
+    competitor_results_count: r.competitor_results_count,
   }));
 
   return (
@@ -381,6 +386,8 @@ export default function Index() {
                 ruleSha256={r.ruleSha256}
                 enableWebSearch={r.enableWebSearch}
                 outputLang={r.outputLang}
+                searchQuery={r.searchQuery}
+                competitorResultsCount={r.competitorResultsCount}
               />
             ))
           )}

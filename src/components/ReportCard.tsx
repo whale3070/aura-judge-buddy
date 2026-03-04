@@ -15,6 +15,8 @@ interface Props {
   ruleSha256?: string;
   enableWebSearch?: boolean;
   outputLang?: "en" | "zh";
+  searchQuery?: string;
+  competitorResultsCount?: number;
 }
 
 function scorePillClass(avg: number | null) {
@@ -24,9 +26,10 @@ function scorePillClass(avg: number | null) {
   return "bg-warning text-warning-foreground border-warning/40 shadow-[0_0_10px_hsl(var(--warning)/0.3)]";
 }
 
-export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256, enableWebSearch, outputLang }: Props) {
+export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256, enableWebSearch, outputLang, searchQuery, competitorResultsCount }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
+  const [showSearchQuery, setShowSearchQuery] = useState(false);
 
   return (
     <div className="border border-border bg-card mb-3 shadow-[0_0_18px_hsl(var(--primary)/0.06)] transition-all">
@@ -54,6 +57,7 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
           {enableWebSearch !== undefined && (
             <Badge variant={enableWebSearch ? "default" : "secondary"} className="text-[10px] py-0 px-1.5">
               {t("judge.badgeSearch")}: {enableWebSearch ? t("judge.on") : t("judge.off")}
+              {enableWebSearch && competitorResultsCount != null && ` (${competitorResultsCount})`}
             </Badge>
           )}
         </div>
@@ -64,6 +68,21 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
 
       {open && (
         <div className="p-3.5 bg-card border-t border-border">
+          {searchQuery && (
+            <div className="mb-3">
+              <button
+                onClick={() => setShowSearchQuery(!showSearchQuery)}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+              >
+                {showSearchQuery ? "▼" : "▶"} {t("judge.searchQuery")}
+              </button>
+              {showSearchQuery && (
+                <div className="mt-1 text-xs font-mono text-muted-foreground/80 bg-muted/30 border border-border p-2">
+                  {searchQuery}
+                </div>
+              )}
+            </div>
+          )}
           {error ? (
             <div className="text-destructive font-bold">ERROR: {error}</div>
           ) : reports.length === 0 ? (

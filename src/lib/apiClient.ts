@@ -64,6 +64,8 @@ export interface SavedResult {
   reports: AuditReport[];
   rule_version_id?: string;
   rule_sha256?: string;
+  search_query?: string;
+  competitor_results_count?: number;
 }
 
 export interface RuleVersionMeta {

@@ -6,6 +6,7 @@ export interface RankingItem {
   timestamp: string;
   rule_version_id?: string;
   rule_sha256?: string;
+  competitor_results_count?: number;
 }
 
 interface Props {
@@ -54,14 +55,15 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
               <th className="p-3 text-left text-foreground/80">{t("ranking.projectDoc")}</th>
               <th className="p-3 text-left text-foreground/80 w-36">{t("ranking.survivalRate")}</th>
               <th className="p-3 text-left text-foreground/80 w-32">{t("ranking.ruleVersion")}</th>
+              <th className="p-3 text-left text-foreground/80 w-24">{t("ranking.competitorSearch")}</th>
               <th className="p-3 text-left text-foreground/80 w-48">{t("ranking.timestamp")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">{t("ranking.loading")}</td></tr>
+              <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">{t("ranking.loading")}</td></tr>
             ) : rankings.length === 0 ? (
-              <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">{t("ranking.empty")}</td></tr>
+              <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">{t("ranking.empty")}</td></tr>
             ) : (
               mergedRankings.map((item, i) => (
                 <tr
@@ -97,6 +99,13 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="p-3 text-xs font-mono">
+                    {item.competitor_results_count != null ? (
+                      <span className="text-primary">ON ({item.competitor_results_count})</span>
+                    ) : (
+                      <span className="text-muted-foreground">OFF</span>
                     )}
                   </td>
                   <td className="p-3 text-muted-foreground text-xs">{new Date(item.timestamp).toLocaleString()}</td>
