@@ -294,6 +294,14 @@ const translations = {
   "judge.off": { zh: "关", en: "OFF" },
   "judge.searchQuery": { zh: "搜索查询", en: "Search Query" },
   "judge.competitorResults": { zh: "竞品结果", en: "Competitor Results" },
+  "judge.competitorSearchDetails": { zh: "竞品检索详情", en: "Competitor Search Details" },
+  "judge.resultsCount": { zh: "结果数", en: "Results" },
+  "judge.queryLabel": { zh: "查询", en: "Query" },
+  "judge.queryNotRecorded": { zh: "（查询未记录）", en: "(query not recorded)" },
+  "judge.keywordsUsed": { zh: "使用的关键词", en: "Keywords Used" },
+  "judge.competitorSearchOff": { zh: "竞品搜索：关闭", en: "Competitor search: OFF" },
+  "judge.copyQuery": { zh: "复制查询", en: "Copy query" },
+  "judge.copied": { zh: "已复制", en: "Copied" },
   "ranking.competitorSearch": { zh: "竞品搜索", en: "Competitor Search" },
 
   // Submit - advanced fields

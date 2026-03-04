@@ -37,6 +37,7 @@ interface ReportEntry {
   outputLang?: "en" | "zh";
   searchQuery?: string;
   competitorResultsCount?: number;
+  projectKeywords?: string[];
 }
 
 function extractAvgScore(reports: AuditReport[]): number | null {
@@ -128,6 +129,7 @@ export default function Index() {
         outputLang,
         searchQuery: data.search_query,
         competitorResultsCount: data.competitor_results_count,
+        projectKeywords: enableWebSearch ? projectKeywords : undefined,
       });
       const r = await fetchRankingsAPI();
       setRankings(r);
@@ -402,6 +404,7 @@ export default function Index() {
                 outputLang={r.outputLang}
                 searchQuery={r.searchQuery}
                 competitorResultsCount={r.competitorResultsCount}
+                projectKeywords={r.projectKeywords}
               />
             ))
           )}
