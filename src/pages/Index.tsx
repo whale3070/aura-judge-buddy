@@ -19,6 +19,9 @@ import ModelSelector from "@/components/ModelSelector";
 import BatchControls from "@/components/BatchControls";
 import ReportCard from "@/components/ReportCard";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 interface ReportEntry {
   id: string;
