@@ -113,11 +113,9 @@ export default function Submit() {
 
   const validate = (): string | null => {
     if (!form.project_title.trim()) return t("submit.validateTitle");
-    if (!form.one_liner.trim()) return t("submit.validateOneLiner");
     if (form.one_liner.length > 200) return t("submit.validateOneLinerLen");
-    if (!form.problem.trim()) return t("submit.validateProblem");
-    if (!form.solution.trim()) return t("submit.validateSolution");
-    if (form.github_url && !/^https?:\/\/.+/.test(form.github_url))
+    if (!form.github_url.trim()) return t("submit.validateGithub");
+    if (!/^https?:\/\/.+/.test(form.github_url))
       return t("submit.validateGithub");
     if (form.demo_url && !/^https?:\/\/.+/.test(form.demo_url))
       return t("submit.validateDemo");
