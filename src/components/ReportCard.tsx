@@ -27,10 +27,19 @@ function scorePillClass(avg: number | null) {
   return "bg-warning text-warning-foreground border-warning/40 shadow-[0_0_10px_hsl(var(--warning)/0.3)]";
 }
 
-export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256, enableWebSearch, outputLang, searchQuery, competitorResultsCount }: Props) {
+export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256, enableWebSearch, outputLang, searchQuery, competitorResultsCount, projectKeywords }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
   const [showSearchQuery, setShowSearchQuery] = useState(false);
+  const [copiedQuery, setCopiedQuery] = useState(false);
+
+  const copyQuery = () => {
+    if (searchQuery) {
+      navigator.clipboard.writeText(searchQuery);
+      setCopiedQuery(true);
+      setTimeout(() => setCopiedQuery(false), 2000);
+    }
+  };
 
   return (
     <div className="border border-border bg-card mb-3 shadow-[0_0_18px_hsl(var(--primary)/0.06)] transition-all">
