@@ -1,4 +1,5 @@
-const API_BASE = "http://localhost:8888";
+const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
+const API_BASE = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy`;
 
 const ADMIN_WALLET_KEY = "aura_admin_wallet";
 
