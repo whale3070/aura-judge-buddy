@@ -223,6 +223,7 @@ export default function MySubmission() {
               rule_sha256: (firstResult as any).rule_sha256,
               search_query: (firstResult as any).search_query,
               competitor_results_count: (firstResult as any).competitor_results_count,
+              reports: firstResult.reports,
             };
           })()}
         />

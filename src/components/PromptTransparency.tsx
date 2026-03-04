@@ -5,12 +5,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { getRuleDownloadURL } from "@/lib/apiClient";
 
 interface PromptTransparencyProps {
-  /** First scored result to extract metadata from */
   result?: {
     rule_version_id?: string;
     rule_sha256?: string;
     search_query?: string;
     competitor_results_count?: number;
+    reports?: { model_name: string; content: string; score?: number; error?: string }[];
   } | null;
 }
 
@@ -44,7 +44,7 @@ export default function PromptTransparency({ result }: PromptTransparencyProps) 
   const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
 
-  const copyToClipboard = (text: string) => {
+  const copy = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => {});
   };
 
@@ -52,6 +52,11 @@ export default function PromptTransparency({ result }: PromptTransparencyProps) 
   const ruleId = result?.rule_version_id;
   const ruleSha = result?.rule_sha256;
   const hasCompetitor = result?.competitor_results_count != null;
+
+  // Unique models from reports
+  const models = result?.reports?.length
+    ? [...new Set(result.reports.map((r) => r.model_name).filter(Boolean))]
+    : null;
 
   return (
     <section className="mb-8">
@@ -69,14 +74,137 @@ export default function PromptTransparency({ result }: PromptTransparencyProps) 
       </div>
 
       {open && (
-        <div className="border border-border rounded p-4 space-y-5 bg-muted/10">
-          {/* A) Prompt Template */}
-          <div>
+        <div className="space-y-5">
+          {/* ========== A) This Run (Actual Values) ========== */}
+          <div className="border border-border rounded p-4 bg-muted/10">
+            <h3 className="text-sm font-bold text-foreground mb-3 border-b border-border pb-2">
+              {t("prompt.thisRun")}
+            </h3>
+
+            <dl className="space-y-3 text-xs">
+              {/* 1) Models used */}
+              <div>
+                <dt className="font-semibold text-foreground mb-1">{t("prompt.modelsUsed")}</dt>
+                <dd className="flex flex-wrap gap-1.5">
+                  {models && models.length > 0 ? (
+                    models.map((m) => (
+                      <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground">{t("prompt.unknown")}</span>
+                  )}
+                </dd>
+              </div>
+
+              {/* 2) Rule version */}
+              <div>
+                <dt className="font-semibold text-foreground mb-1">{t("prompt.ruleVersion")}</dt>
+                <dd>
+                  {ruleId ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="outline" className="text-[10px] font-mono">{ruleId.slice(0, 12)}…</Badge>
+                      {ruleSha && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="text-[10px] cursor-help">SHA256</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="font-mono text-[10px] break-all">{ruleSha}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      <a
+                        href={getRuleDownloadURL(ruleId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-primary hover:underline"
+                      >
+                        ⬇ {t("prompt.downloadYAML")}
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">{t("prompt.ruleNotRecorded")}</p>
+                  )}
+                </dd>
+              </div>
+
+              {/* 3) Competitor search */}
+              <div>
+                <dt className="font-semibold text-foreground mb-1">{t("prompt.competitorSearch")}</dt>
+                <dd>
+                  {hasCompetitor ? (
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant="secondary" className="text-[10px]">
+                          {t("judge.on")} ({result!.competitor_results_count})
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">{t("judge.searchQuery")}:</span>
+                        {result!.search_query ? (
+                          <>
+                            <code className="text-[10px] bg-muted/50 border border-border px-1.5 py-0.5 rounded font-mono break-all">
+                              {result!.search_query}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => copy(result!.search_query!)}
+                              className="text-[10px] text-primary hover:underline"
+                            >
+                              📋 {t("prompt.copyQuery")}
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground italic">{t("prompt.queryNotRecorded")}</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <Badge variant="outline" className="text-[10px]">{t("judge.off")}</Badge>
+                      <p className="text-muted-foreground mt-1">{t("prompt.competitorNotAvailable")}</p>
+                    </div>
+                  )}
+                </dd>
+              </div>
+
+              {/* 4) Output language */}
+              <div>
+                <dt className="font-semibold text-foreground mb-1">{t("prompt.language")}</dt>
+                <dd>
+                  <span className="text-muted-foreground">{t("prompt.langUnknown")}</span>
+                </dd>
+              </div>
+
+              {/* 5) Custom instruction */}
+              <div>
+                <dt className="font-semibold text-foreground mb-1">
+                  {t("prompt.instructionFallbackLabel")}
+                </dt>
+                <dd>
+                  <pre className="text-xs text-foreground/80 whitespace-pre-wrap break-words bg-muted/30 p-3 border border-border rounded font-sans leading-relaxed">
+                    {customPrompt}
+                  </pre>
+                  <p className="text-[10px] text-muted-foreground mt-1">{t("prompt.instructionFallbackNote")}</p>
+                  <button
+                    type="button"
+                    onClick={() => copy(customPrompt)}
+                    className="text-[10px] border border-border px-2 py-0.5 mt-1 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+                  >
+                    📋 {t("prompt.copyInstruction")}
+                  </button>
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          {/* ========== B) Prompt Template (Public) ========== */}
+          <div className="border border-border rounded p-4 bg-muted/10">
             <div className="flex items-center justify-between mb-1.5">
-              <h3 className="text-sm font-semibold text-foreground">{t("prompt.template")}</h3>
+              <h3 className="text-sm font-bold text-foreground">{t("prompt.template")}</h3>
               <button
                 type="button"
-                onClick={() => copyToClipboard(PROMPT_TEMPLATE)}
+                onClick={() => copy(PROMPT_TEMPLATE)}
                 className="text-[10px] border border-border px-2 py-0.5 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
               >
                 📋 {t("prompt.copyTemplate")}
@@ -86,90 +214,6 @@ export default function PromptTransparency({ result }: PromptTransparencyProps) 
             <pre className="text-xs text-foreground/80 whitespace-pre-wrap break-words bg-muted/30 p-3 border border-border rounded font-mono leading-relaxed max-h-64 overflow-y-auto">
               {PROMPT_TEMPLATE}
             </pre>
-          </div>
-
-          {/* B) Custom Instruction */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <h3 className="text-sm font-semibold text-foreground">{t("prompt.customInstruction")}</h3>
-              <button
-                type="button"
-                onClick={() => copyToClipboard(customPrompt)}
-                className="text-[10px] border border-border px-2 py-0.5 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
-              >
-                📋 {t("prompt.copyInstruction")}
-              </button>
-            </div>
-            <pre className="text-xs text-foreground/80 whitespace-pre-wrap break-words bg-muted/30 p-3 border border-border rounded font-sans leading-relaxed">
-              {customPrompt}
-            </pre>
-          </div>
-
-          {/* C) Language */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-foreground">{t("prompt.language")}:</span>
-            <Badge variant="outline" className="text-[10px]">
-              {lang === "zh" ? "ZH (中文)" : "EN (English)"}
-            </Badge>
-          </div>
-
-          {/* D) Competitor Search */}
-          <div>
-            <span className="text-xs font-semibold text-foreground">{t("prompt.competitorSearch")}:</span>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              {hasCompetitor ? (
-                <>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {t("judge.on")} ({result!.competitor_results_count})
-                  </Badge>
-                  {result!.search_query && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Badge variant="outline" className="text-[10px] cursor-help">
-                          🔍 {t("judge.searchQuery")}
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-sm">
-                        <p className="text-xs">{result!.search_query}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </>
-              ) : (
-                <Badge variant="outline" className="text-[10px]">{t("judge.off")}</Badge>
-              )}
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-1">{t("prompt.keywordsNote")}</p>
-          </div>
-
-          {/* E) Active Rule Version */}
-          <div>
-            <span className="text-xs font-semibold text-foreground">{t("prompt.ruleVersion")}:</span>
-            {ruleId ? (
-              <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                <Badge variant="outline" className="text-[10px] font-mono">{ruleId.slice(0, 12)}…</Badge>
-                {ruleSha && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge variant="outline" className="text-[10px] cursor-help">SHA256</Badge>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p className="font-mono text-[10px] break-all">{ruleSha}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                <a
-                  href={getRuleDownloadURL(ruleId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[10px] text-primary hover:underline"
-                >
-                  ⬇ {t("prompt.downloadYAML")}
-                </a>
-              </div>
-            ) : (
-              <p className="text-[10px] text-muted-foreground mt-1">{t("prompt.noRule")}</p>
-            )}
           </div>
         </div>
       )}
