@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchSubmissionById, fetchRankings, fetchJudgeResult, fetchFileTitles, type SubmissionItem, type RankingItem, type JudgeResult } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
+import PromptTransparency from "@/components/PromptTransparency";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
