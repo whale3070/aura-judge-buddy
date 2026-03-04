@@ -271,6 +271,62 @@ export default function Index() {
         <PromptEditor value={prompt} onChange={setPrompt} />
         <ModelSelector selected={selectedModels} onChange={setSelectedModels} />
 
+        {/* Competitor Search + Output Language */}
+        <div className="border border-border p-4 mb-4 bg-muted/30 space-y-4">
+          <div className="flex items-center gap-3">
+            <Switch id="web-search" checked={enableWebSearch} onCheckedChange={setEnableWebSearch} />
+            <Label htmlFor="web-search" className="text-sm font-bold text-foreground/90">
+              {t("judge.competitorSearch")}
+            </Label>
+          </div>
+          {enableWebSearch && (
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1 block">{t("judge.competitorKeywords")}</Label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {projectKeywords.map((kw, i) => (
+                  <Badge key={i} variant="secondary" className="cursor-pointer" onClick={() => setProjectKeywords(prev => prev.filter((_, j) => j !== i))}>
+                    {kw} ✕
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 bg-background border border-border px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground"
+                  placeholder={t("judge.keywordsPlaceholder")}
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && keywordInput.trim()) {
+                      e.preventDefault();
+                      const newKws = keywordInput.split(",").map(s => s.trim()).filter(Boolean);
+                      setProjectKeywords(prev => [...new Set([...prev, ...newKws])]);
+                      setKeywordInput("");
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setProjectKeywords(prev => [...new Set([...prev, ...COMMON_KEYWORDS])])}
+                  className="text-xs border border-primary/40 px-3 py-1.5 text-primary hover:bg-primary/10 transition-colors whitespace-nowrap"
+                >
+                  {t("judge.addCommonKeywords")}
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <Label className="text-xs text-muted-foreground">{t("judge.outputLang")}:</Label>
+            <select
+              value={outputLang}
+              onChange={(e) => setOutputLang(e.target.value as "en" | "zh")}
+              className="bg-background border border-border px-2 py-1 text-sm text-foreground"
+            >
+              <option value="en">{t("judge.langEn")}</option>
+              <option value="zh">{t("judge.langZh")}</option>
+            </select>
+          </div>
+        </div>
+
         <div className="flex gap-3 mb-2">
           <button
             onClick={runSingleAudit}
