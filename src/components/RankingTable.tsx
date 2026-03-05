@@ -103,8 +103,8 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
                     )}
                   </td>
                   <td className="p-3 text-xs font-mono">
-                    {item.competitor_results_count != null ? (
-                      <span className="text-primary">ON ({item.competitor_results_count})</span>
+                    {(item.search_query?.trim() ?? '') !== '' || (item.competitor_results_count ?? 0) > 0 ? (
+                      <span className="text-primary">ON{item.competitor_results_count != null ? ` (${item.competitor_results_count})` : ''}</span>
                     ) : (
                       <span className="text-muted-foreground">OFF</span>
                     )}
