@@ -153,8 +153,8 @@ export default function Submit() {
         method: "POST",
         body: fd,
       });
-      if (!res.ok) throw new Error("提交失败");
       const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "提交失败");
       const submissionId = data?.id;
       setForm(EMPTY_FORM);
       setFiles([]);
@@ -163,8 +163,8 @@ export default function Submit() {
       if (submissionId) {
         navigate(`/my-submission/${submissionId}`);
       }
-    } catch {
-      toast.error(t("submit.submitFail"));
+    } catch (e: any) {
+      toast.error(e?.message || t("submit.submitFail"));
     }
     setSubmitting(false);
   };
