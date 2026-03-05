@@ -147,7 +147,7 @@ export function submitAuditAPI(opts: AuditOptions): Promise<SavedResult> {
 }
 
 export function fetchRankingsAPI(): Promise<SavedResult[]> {
-  return request<SavedResult[]>("/api/ranking").catch(() => []);
+  return request<SavedResult[]>("/api/ranking?prefer_search=1").catch(() => []);
 }
 
 export function fetchFileTitlesAPI(): Promise<Record<string, string>> {
