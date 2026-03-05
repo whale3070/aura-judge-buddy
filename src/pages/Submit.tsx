@@ -163,8 +163,8 @@ export default function Submit() {
       if (submissionId) {
         navigate(`/my-submission/${submissionId}`);
       }
-    } catch {
-      toast.error(t("submit.submitFail"));
+    } catch (e: any) {
+      toast.error(e?.message || t("submit.submitFail"));
     }
     setSubmitting(false);
   };
