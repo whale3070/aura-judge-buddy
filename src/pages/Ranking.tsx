@@ -1,22 +1,52 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { fetchRankingsAPI, fetchFileTitlesAPI, type SavedResult } from "@/lib/apiClient";
+import {
+  fetchRankingsAPI,
+  fetchFileTitlesAPI,
+  fetchRuleVersionsAPI,
+  type SavedResult,
+  type RuleVersionMeta,
+} from "@/lib/apiClient";
 import RankingTable from "@/components/RankingTable";
+import RankingRuleFilterBar from "@/components/RankingRuleFilterBar";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
+import {
+  DEFAULT_RANKING_RULE_ID,
+  buildRuleFilterOptions,
+  filterRankingsByRule,
+} from "@/lib/rankingRuleFilter";
 
 export default function Ranking() {
   const { t } = useI18n();
   const [rankings, setRankings] = useState<SavedResult[]>([]);
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [ruleFilterId, setRuleFilterId] = useState(DEFAULT_RANKING_RULE_ID);
+  const [versionMetas, setVersionMetas] = useState<RuleVersionMeta[]>([]);
 
   useEffect(() => {
-    Promise.all([fetchRankingsAPI(), fetchFileTitlesAPI()])
-      .then(([r, t]) => { setRankings(r); setTitleMap(t); })
+    setLoading(true);
+    Promise.all([
+      fetchRankingsAPI(),
+      fetchFileTitlesAPI(),
+      fetchRuleVersionsAPI().catch(() => ({ versions: [] })),
+    ])
+      .then(([r, titles, ver]) => {
+        setRankings(r);
+        setTitleMap(titles);
+        setVersionMetas(ver.versions ?? []);
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  const rankingItems = rankings.map(r => ({
+  const ruleOptions = useMemo(() => buildRuleFilterOptions(rankings, versionMetas), [rankings, versionMetas]);
+
+  const filteredRankings = useMemo(
+    () => filterRankingsByRule(rankings, ruleFilterId),
+    [rankings, ruleFilterId]
+  );
+
+  const rankingItems = filteredRankings.map((r) => ({
     file_name: r.file_name,
     avg_score: r.avg_score,
     timestamp: r.timestamp,
@@ -25,6 +55,9 @@ export default function Ranking() {
     search_query: r.search_query,
     competitor_results_count: r.competitor_results_count,
   }));
+
+  const emptyHint =
+    !loading && rankings.length > 0 && rankingItems.length === 0 ? t("ranking.emptyRuleFiltered") : undefined;
 
   return (
     <div className="min-h-screen bg-background p-5 relative overflow-hidden">
@@ -44,7 +77,13 @@ export default function Ranking() {
         <p className="text-center text-xs text-muted-foreground mb-4">
           {t("ranking.note")}
         </p>
-        <RankingTable rankings={rankingItems} loading={loading} titleMap={titleMap} />
+        <RankingRuleFilterBar
+          value={ruleFilterId}
+          onChange={setRuleFilterId}
+          options={ruleOptions}
+          disabled={loading}
+        />
+        <RankingTable rankings={rankingItems} loading={loading} titleMap={titleMap} emptyHint={emptyHint} />
       </div>
     </div>
   );

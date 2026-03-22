@@ -16,9 +16,11 @@ interface Props {
   selectedFile?: string;
   onSelect?: (fileName: string) => void;
   titleMap?: Record<string, string>;
+  /** 无行时提示（例如当前规则下无数据） */
+  emptyHint?: string;
 }
 
-export default function RankingTable({ rankings, loading, selectedFile, onSelect, titleMap }: Props) {
+export default function RankingTable({ rankings, loading, selectedFile, onSelect, titleMap, emptyHint }: Props) {
   const { t } = useI18n();
 
   const mergedRankings = (() => {
@@ -64,7 +66,7 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
             {loading ? (
               <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">{t("ranking.loading")}</td></tr>
             ) : rankings.length === 0 ? (
-              <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">{t("ranking.empty")}</td></tr>
+              <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">{emptyHint ?? t("ranking.empty")}</td></tr>
             ) : (
               mergedRankings.map((item, i) => (
                 <tr

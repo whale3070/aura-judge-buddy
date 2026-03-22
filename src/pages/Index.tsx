@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   fetchFilesAPI,
@@ -6,11 +6,14 @@ import {
   fetchRankingsAPI,
   fetchAdminConfigAPI,
   fetchFileTitlesAPI,
+  fetchRuleVersionsAPI,
   type AuditReport,
   type SavedResult,
+  type RuleVersionMeta,
 } from "@/lib/apiClient";
 import JudgeDetail from "@/components/JudgeDetail";
 import RankingTable from "@/components/RankingTable";
+import RankingRuleFilterBar from "@/components/RankingRuleFilterBar";
 import ActiveRulePanel from "@/components/ActiveRulePanel";
 import FileSelector from "@/components/FileSelector";
 import ModelSelector from "@/components/ModelSelector";
@@ -22,6 +25,11 @@ import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  DEFAULT_RANKING_RULE_ID,
+  buildRuleFilterOptions,
+  filterRankingsByRule,
+} from "@/lib/rankingRuleFilter";
 
 const COMMON_KEYWORDS = ["GoPlus","token security API","rug pull detection","address scan","contract risk scoring","honeypot detection","token risk API","address risk API"];
 
@@ -71,18 +79,22 @@ export default function Index() {
   const [projectKeywords, setProjectKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState("");
   const [outputLang, setOutputLang] = useState<"en" | "zh">("en");
+  const [ruleFilterId, setRuleFilterId] = useState(DEFAULT_RANKING_RULE_ID);
+  const [versionMetas, setVersionMetas] = useState<RuleVersionMeta[]>([]);
 
   const loadData = useCallback(async () => {
-    const [f, r, t] = await Promise.all([
+    const [f, r, t, ver] = await Promise.all([
       fetchFilesAPI().catch(() => []),
       fetchRankingsAPI().catch(() => []),
       fetchFileTitlesAPI().catch(() => ({} as Record<string, string>)),
+      fetchRuleVersionsAPI().catch(() => ({ versions: [] as RuleVersionMeta[] })),
     ]);
     setFiles(f);
     if (f.length > 0) setSelectedFile(f[0]);
     setFilesLoading(false);
     setRankings(r);
     setTitleMap(t);
+    setVersionMetas(ver.versions ?? []);
     setRankingsLoading(false);
   }, []);
 
@@ -220,15 +232,25 @@ export default function Index() {
     try { const r = await fetchRankingsAPI(); setRankings(r); } catch { /* */ }
   };
 
-  // Convert SavedResult[] to RankingItem-like for RankingTable
-  const rankingItems = rankings.map(r => ({
+  const ruleOptions = useMemo(() => buildRuleFilterOptions(rankings, versionMetas), [rankings, versionMetas]);
+
+  const filteredRankings = useMemo(
+    () => filterRankingsByRule(rankings, ruleFilterId),
+    [rankings, ruleFilterId]
+  );
+
+  const rankingItems = filteredRankings.map((r) => ({
     file_name: r.file_name,
     avg_score: r.avg_score,
     timestamp: r.timestamp,
     rule_version_id: r.rule_version_id,
     rule_sha256: r.rule_sha256,
+    search_query: r.search_query,
     competitor_results_count: r.competitor_results_count,
   }));
+
+  const rankingEmptyHint =
+    !rankingsLoading && rankings.length > 0 && rankingItems.length === 0 ? t("ranking.emptyRuleFiltered") : undefined;
 
   return (
     <div className="min-h-screen bg-background p-5 relative overflow-hidden">
@@ -265,12 +287,19 @@ export default function Index() {
 
         <ActiveRulePanel />
 
+        <RankingRuleFilterBar
+          value={ruleFilterId}
+          onChange={setRuleFilterId}
+          options={ruleOptions}
+          disabled={rankingsLoading}
+        />
         <RankingTable
           rankings={rankingItems}
           loading={rankingsLoading}
           selectedFile={selectedRankingFile ?? undefined}
           onSelect={(f) => setSelectedRankingFile(f === selectedRankingFile ? null : f)}
           titleMap={titleMap}
+          emptyHint={rankingEmptyHint}
         />
 
         {selectedRankingFile && (

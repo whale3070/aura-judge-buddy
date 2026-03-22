@@ -91,6 +91,19 @@ const translations = {
   "ranking.timestamp": { zh: "存证时间", en: "Timestamp" },
   "ranking.loading": { zh: "正在同步金库协议历史存证...", en: "Syncing vault protocol attestations..." },
   "ranking.empty": { zh: "VOID_DATA", en: "VOID_DATA" },
+  "ranking.ruleRubric": { zh: "排行榜规则（按存证 rule_version_id 隔离）", en: "Leaderboard rubric (isolated by rule_version_id)" },
+  "ranking.ruleFilterHint": {
+    zh: "不同 YAML 规则产生的分数不可横向对比。请选择一条规则版本，仅展示该规则下产生的排名；默认本届为 v4 五维 20 分 + AI_SCORE。",
+    en: "Scores from different rule versions are not comparable. Pick one rule to show only rankings produced under that rubric; default is v4 (five dims /20 + AI_SCORE).",
+  },
+  "ranking.rulePlaceholder": { zh: "选择规则版本", en: "Select rule version" },
+  "ranking.ruleDefaultBadge": { zh: "默认", en: "Default" },
+  "ranking.ruleLegacyOption": { zh: "旧数据（存证无 rule_version_id）", en: "Legacy (no rule_version_id in attestation)" },
+  "ranking.ruleSelectedMeta": { zh: "ID: {id} · SHA256: {sha}", en: "ID: {id} · SHA256: {sha}" },
+  "ranking.emptyRuleFiltered": {
+    zh: "当前所选规则下暂无排名数据。可切换其他规则，或等待使用该规则的评审完成。",
+    en: "No ranking rows for the selected rule. Switch rules or wait until audits complete under this rubric.",
+  },
 
   // MySubmission page
   "my.title": { zh: "我的项目", en: "My Project" },
