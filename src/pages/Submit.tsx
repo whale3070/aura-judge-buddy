@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { MODELS } from "@/lib/prompts";
+import { API_BASE } from "@/lib/apiClient";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 
@@ -148,8 +149,7 @@ export default function Submit() {
     }
 
     try {
-      const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
-      const res = await fetch(`https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy/api/submit`, {
+      const res = await fetch(`${API_BASE}/api/submit`, {
         method: "POST",
         body: fd,
       });

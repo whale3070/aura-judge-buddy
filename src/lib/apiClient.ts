@@ -1,5 +1,19 @@
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
-const API_BASE = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy`;
+
+/**
+ * 自建后端时设置 VITE_API_BASE（无尾部斜杠），例如 http://198.55.109.102:8888
+ * 否则请求会发到 Supabase Edge Function api-proxy，你的 aura 进程上不会出现 /api/audit 日志。
+ */
+function resolveApiBase(): string {
+  const custom = import.meta.env.VITE_API_BASE;
+  if (typeof custom === "string") {
+    const t = custom.trim().replace(/\/$/, "");
+    if (t) return t;
+  }
+  return `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy`;
+}
+
+export const API_BASE = resolveApiBase();
 
 const ADMIN_WALLET_KEY = "aura_admin_wallet";
 

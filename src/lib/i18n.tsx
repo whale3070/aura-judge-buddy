@@ -102,6 +102,11 @@ const translations = {
   "my.noScore": { zh: "未出分或加载失败", en: "Score unavailable" },
   "my.showDetail": { zh: "查看评审详情", en: "View review details" },
   "my.hideDetail": { zh: "收起详情", en: "Hide details" },
+  "my.dimensionTableTitle": { zh: "各模型维度分数对比", en: "Dimension scores by model" },
+  "my.dimensionCol": { zh: "维度", en: "Dimension" },
+  "my.varianceCol": { zh: "分差", en: "Spread" },
+  "my.needReview": { zh: "需复核", en: "Review" },
+  "my.noDimensionData": { zh: "未解析到维度分数（报告格式可能不同）", en: "No dimension scores parsed (report format may vary)" },
   "my.systemRanking": { zh: "系统排名", en: "System Rankings" },
   "my.rankingNote": { zh: "你可看到全部项目的排名；仅你自己的项目可点击查看详情。", en: "You can see all project rankings; only your own projects are clickable for details." },
   "my.rankCol": { zh: "#", en: "#" },
@@ -117,6 +122,12 @@ const translations = {
   // Judge (Index) page
   "judge.singleBtn": { zh: "单文件裁决 (SINGLE EXECUTE)", en: "Single File Judge (EXECUTE)" },
   "judge.singleRunning": { zh: "▶ 裁决中...", en: "▶ Judging..." },
+  "judge.singleProgressTitle": { zh: "裁决进行中", en: "Audit in progress" },
+  "judge.singleProgressHint": {
+    zh: "已选择 {n} 个模型并行评审：服务器正在检索文档、调用模型并写入存证，通常需数十秒至数分钟。进度条为活动指示（非精确百分比），页面未卡死，请稍候。",
+    en: "{n} model(s) selected: the server is reading the document, calling providers, and saving results—often tens of seconds to a few minutes. The bar is an activity indicator (not exact %); the page is still working.",
+  },
+  "judge.selectFileAndModels": { zh: "请先选择目标文档，并至少勾选一个裁决模型。", en: "Select a target document and at least one judge model." },
   "judge.batchBtn": { zh: "批量裁决 (BATCH EXECUTE)", en: "Batch Judge (EXECUTE)" },
   "judge.batchRunning": { zh: "▶ 批量裁决中...", en: "▶ Batch judging..." },
   "judge.stopBtn": { zh: "停止批量 (STOP)", en: "Stop Batch" },
@@ -150,6 +161,10 @@ const translations = {
 
   // ReportCard
   "report.waiting": { zh: "等待数据...", en: "Waiting for data..." },
+  "report.auditInProgress": {
+    zh: "本条请求已发出，正在等待后端与模型返回；完成后会自动替换为报告。请勿误以为页面卡死。",
+    en: "This request is in flight. Reports will appear here when the backend finishes—please wait; the page is not frozen.",
+  },
   "report.judgeNode": { zh: "判官节点:", en: "Judge Node:" },
 
   // JudgeDetail
@@ -173,6 +188,17 @@ const translations = {
   "admin.confirmDelete": { zh: "确认删除项目「{title}」？此操作不可撤销。", en: "Delete project \"{title}\"? This action cannot be undone." },
   "admin.relatedDocs": { zh: "关联文档", en: "Related Docs" },
   "admin.redirecting": { zh: "正在跳转到首页…", en: "Redirecting to home..." },
+  "admin.filterAll": { zh: "全部", en: "All" },
+  "admin.filterBeginner": { zh: "小白", en: "Beginner" },
+  "admin.filterLongterm": { zh: "长期 Builder", en: "Long-term Builder" },
+  "admin.accountYears": { zh: "账号年限", en: "Account years" },
+  "admin.accountYearsValue": { zh: "{n} 年", en: "{n} yr" },
+  "admin.accountYearsFetching": { zh: "获取中", en: "Fetching..." },
+  "admin.accountYearsNoGitHub": { zh: "未关联 GitHub", en: "No GitHub" },
+  "admin.builderTagBeginner": { zh: "小白", en: "Beginner" },
+  "admin.builderTagLongterm": { zh: "长期", en: "Long-term" },
+  "my.githubAccountYears": { zh: "账号年限：{n} 年", en: "Account years: {n} yr" },
+  "my.githubAccountYearsShort": { zh: "{n} 年 builder", en: "{n} yr builder" },
 
   // Login page
   "login.noAccount": { zh: "没有账号？注册", en: "No account? Register" },

@@ -106,6 +106,21 @@
   animation: text-flicker 4s linear infinite;
 }
 
+/* Single-file audit: indeterminate progress (no server % available) */
+@keyframes aura-audit-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.aura-audit-indeterminate-bar {
+  animation: aura-audit-indeterminate 1.35s ease-in-out infinite;
+  box-shadow: 0 0 10px hsl(120 100% 56% / 0.45);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

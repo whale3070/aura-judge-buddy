@@ -1,5 +1,6 @@
+import { API_BASE } from "./apiClient";
+
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
-const API_BASE = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy`;
 
 export interface AuditReport {
   model_name: string;
@@ -17,6 +18,11 @@ export interface RankingItem {
   file_name: string;
   avg_score: number;
   timestamp: string;
+  reports?: AuditReport[];
+  rule_version_id?: string;
+  rule_sha256?: string;
+  search_query?: string;
+  competitor_results_count?: number;
 }
 
 export interface JudgeResult {
@@ -35,7 +41,13 @@ export interface SubmissionItem {
   demo_url: string;
   why_this_chain: string;
   md_files: string[];
+  /** GitHub 账号年限相关（后端异步拉取，可能暂时为空） */
+  github_username?: string;
+  github_account_created_at?: string;
+  github_account_years?: number;
 }
+
+export type BuilderFilter = "all" | "beginner" | "longterm";
 
 export interface AdminConfig {
   admin_hash?: string;
@@ -67,8 +79,34 @@ export async function submitAudit(
 }
 
 export async function fetchRankings(): Promise<RankingItem[]> {
-  const res = await fetch(`${API_BASE}/api/ranking`);
+  const res = await fetch(`${API_BASE}/api/ranking?prefer_search=1`);
   if (!res.ok) return [];
+  return res.json();
+}
+
+export interface DuelResponse {
+  winner: string;
+  reason: string;
+  raw: string;
+  model: string;
+}
+
+export async function submitDuel(
+  adminWallet: string,
+  body: { file_a: string; file_b: string; model?: string; output_lang?: "en" | "zh" }
+): Promise<DuelResponse> {
+  const res = await fetch(`${API_BASE}/api/duel`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Wallet": adminWallet,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "对决请求失败" }));
+    throw new Error(err.error || err.message || "对决请求失败");
+  }
   return res.json();
 }
 
@@ -91,12 +129,16 @@ export async function fetchSubmissionById(id: string): Promise<SubmissionItem | 
   }
 }
 
-export async function fetchSubmissions(adminWallet?: string): Promise<SubmissionItem[]> {
+export async function fetchSubmissions(
+  adminWallet?: string,
+  builderFilter?: BuilderFilter
+): Promise<SubmissionItem[]> {
   if (!adminWallet) return [];
-  const res = await fetch(`${API_BASE}/api/submissions`, {
-    headers: {
-      "X-Admin-Wallet": adminWallet,
-    },
+  const params = new URLSearchParams();
+  if (builderFilter && builderFilter !== "all") params.set("builder_filter", builderFilter);
+  const url = params.toString() ? `${API_BASE}/api/submissions?${params}` : `${API_BASE}/api/submissions`;
+  const res = await fetch(url, {
+    headers: { "X-Admin-Wallet": adminWallet },
   });
   if (!res.ok) {
     if (res.status === 401) console.warn("[Admin] 提交列表 401：请确认代理已转发 X-Admin-Wallet 请求头");

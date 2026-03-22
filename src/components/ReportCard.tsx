@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import type { AuditReport } from "@/lib/apiClient";
 import { useI18n } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
+import AuditIndeterminateProgress from "@/components/AuditIndeterminateProgress";
 
 interface Props {
   fileName: string;
@@ -120,6 +121,8 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
           )}
           {error ? (
             <div className="text-destructive font-bold">ERROR: {error}</div>
+          ) : reports.length === 0 && statusText === "RUNNING" ? (
+            <AuditIndeterminateProgress title={t("judge.singleProgressTitle")} hint={t("report.auditInProgress")} />
           ) : reports.length === 0 ? (
             <div className="text-muted-foreground">{t("report.waiting")}</div>
           ) : (

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { fetchSubmissionById, fetchRankings, fetchJudgeResult, fetchFileTitles, type SubmissionItem, type RankingItem, type JudgeResult } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import PromptTransparency from "@/components/PromptTransparency";
+import DimensionScoreTable from "@/components/DimensionScoreTable";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -88,11 +89,18 @@ export default function MySubmission() {
         <div className="mb-6 p-4 bg-muted/30 border border-border rounded">
           <h2 className="text-sm font-bold text-foreground mb-2">{submission.project_title}</h2>
           <p className="text-xs text-muted-foreground">{submission.one_liner}</p>
-          {submission.github_url && (
-            <a href={submission.github_url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline mt-2 inline-block">
-              {submission.github_url}
-            </a>
-          )}
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+            {submission.github_url && (
+              <a href={submission.github_url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                {submission.github_username ? `@${submission.github_username}` : submission.github_url}
+              </a>
+            )}
+            {(submission.github_account_years ?? 0) > 0 && (
+              <span className="text-muted-foreground">
+                {t("my.githubAccountYearsShort", { n: submission.github_account_years })}
+              </span>
+            )}
+          </div>
         </div>
 
         <section className="mb-8">
@@ -189,7 +197,8 @@ export default function MySubmission() {
                       </button>
                     )}
                     {selectedFile === file && result && (
-                      <div className="mt-3 pt-3 border-t border-border">
+                      <div className="mt-3 pt-3 border-t border-border space-y-4">
+                        <DimensionScoreTable reports={result.reports ?? []} className="mb-4" />
                         {result.reports?.map((r, i) => (
                           <div key={i} className="mb-3">
                             <div className="flex items-center gap-2 mb-1">

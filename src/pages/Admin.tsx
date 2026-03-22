@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { fetchRankings, fetchSubmissions, fetchAdminConfig, fetchFileTitles, deleteSubmission, type RankingItem, type SubmissionItem } from "@/lib/api";
+import { fetchRankings, fetchSubmissions, fetchAdminConfig, fetchFileTitles, deleteSubmission, type RankingItem, type SubmissionItem, type BuilderFilter } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import GradeRankingPanel from "@/components/GradeRankingPanel";
 import { useWallet } from "@/hooks/useWallet";
@@ -21,11 +21,12 @@ export default function Admin() {
   const [configLoading, setConfigLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [tab, setTab] = useState<"rankings" | "submissions">("rankings");
+  const [builderFilter, setBuilderFilter] = useState<BuilderFilter>("all");
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!wallet.address) return;
-    fetchSubmissions(wallet.address)
+    fetchSubmissions(wallet.address, "all")
       .then(setSubmissions)
       .catch(() => setSubmissions([]));
   }, [wallet.address]);
@@ -63,6 +64,8 @@ export default function Admin() {
 
   const hashOk = adminHash ? hash === adminHash : true;
   const isAdmin = !!wallet.address && !!adminWallet && wallet.address.toLowerCase() === adminWallet;
+  // 与后端一致：未配置 AURA_ADMIN_WALLET 时任意连接钱包即可查看列表；已配置时需匹配管理员
+  const canViewSubmissions = !!wallet.address && (!adminWallet || wallet.address.toLowerCase() === adminWallet);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -80,12 +83,12 @@ export default function Admin() {
   }, [hashOk]);
 
   useEffect(() => {
-    if (!hashOk || !isAdmin || !wallet.address) { setSubmissionsLoading(false); return; }
+    if (!hashOk || !canViewSubmissions || !wallet.address) { setSubmissionsLoading(false); return; }
     setSubmissionsLoading(true);
-    fetchSubmissions(wallet.address)
+    fetchSubmissions(wallet.address, builderFilter)
       .then(setSubmissions)
       .finally(() => setSubmissionsLoading(false));
-  }, [hashOk, isAdmin, wallet.address]);
+  }, [hashOk, canViewSubmissions, wallet.address, builderFilter]);
 
   if (configLoading) {
     return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">LOADING...</div>;
@@ -150,12 +153,32 @@ export default function Admin() {
         </div>
 
         {tab === "rankings" && (
-          <GradeRankingPanel rankings={rankings} loading={rankingsLoading} titleMap={titleMap} />
+          <GradeRankingPanel
+            rankings={rankings}
+            loading={rankingsLoading}
+            titleMap={titleMap}
+            adminWallet={wallet.address ?? null}
+          />
         )}
 
         {tab === "submissions" && (
-          isAdmin ? (
-            <SubmissionsTab submissions={submissions} loading={submissionsLoading} onViewFile={setSelectedFile} adminWallet={wallet.address!} onDeleted={(id) => setSubmissions(prev => prev.filter(s => s.id !== id))} />
+          canViewSubmissions ? (
+            <>
+              <div className="flex gap-0 mb-4 border-b border-border">
+                {(["all", "beginner", "longterm"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setBuilderFilter(f)}
+                    className={`px-4 py-2 text-xs font-bold tracking-wider transition-colors ${
+                      builderFilter === f ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {f === "all" ? t("admin.filterAll") : f === "beginner" ? t("admin.filterBeginner") : t("admin.filterLongterm")}
+                  </button>
+                ))}
+              </div>
+              <SubmissionsTab submissions={submissions} loading={submissionsLoading} onViewFile={setSelectedFile} adminWallet={wallet.address!} onDeleted={(id) => setSubmissions(prev => prev.filter(s => s.id !== id))} canDelete={canViewSubmissions} />
+            </>
           ) : (
             <div className="border border-border p-8 bg-muted/20 text-center">
               <p className="text-muted-foreground mb-4">{t("admin.walletRequired")}</p>
@@ -180,13 +203,14 @@ export default function Admin() {
 }
 
 function SubmissionsTab({
-  submissions, loading, onViewFile, adminWallet, onDeleted,
+  submissions, loading, onViewFile, adminWallet, onDeleted, canDelete = true,
 }: {
   submissions: SubmissionItem[];
   loading: boolean;
   onViewFile: (f: string) => void;
   adminWallet: string;
   onDeleted: (id: string) => void;
+  canDelete?: boolean;
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -209,30 +233,55 @@ function SubmissionsTab({
   if (loading) return <div className="text-muted-foreground text-sm">{t("admin.loadingSub")}</div>;
   if (submissions.length === 0) return <div className="text-muted-foreground text-sm">{t("admin.noSub")}</div>;
 
+  const accountYearsLabel = (s: SubmissionItem) => {
+    const years = s.github_account_years ?? 0;
+    if (years > 0) return t("admin.accountYearsValue", { n: years });
+    if (s.github_username) return t("admin.accountYearsFetching");
+    return t("admin.accountYearsNoGitHub");
+  };
+  const builderTag = (s: SubmissionItem) => {
+    const years = s.github_account_years ?? 0;
+    if (years <= 1 || (s.github_username && years === 0)) return t("admin.builderTagBeginner");
+    if (years >= 3) return t("admin.builderTagLongterm");
+    return null;
+  };
+
   return (
     <div className="space-y-3">
       {submissions.map((s) => (
         <div key={s.id} className="border border-border bg-muted/20">
-          <div className="flex items-center">
+          <div className="flex items-center flex-wrap gap-2">
             <button
               onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-              className="flex-1 min-w-0 flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors"
+              className="flex-1 min-w-0 flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors gap-3"
             >
               <div className="min-w-0">
                 <div className="font-bold text-foreground/90 truncate">{s.project_title}</div>
                 <div className="text-xs text-muted-foreground mt-0.5 truncate">{s.one_liner}</div>
               </div>
-              <div className="text-xs text-muted-foreground whitespace-nowrap ml-3">
-                {new Date(s.created_at).toLocaleString()}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-muted-foreground whitespace-nowrap" title={t("admin.accountYears")}>
+                  {accountYearsLabel(s)}
+                </span>
+                {builderTag(s) && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
+                    {builderTag(s)}
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {new Date(s.created_at).toLocaleString()}
+                </span>
               </div>
             </button>
-            <button
-              onClick={() => handleDelete(s.id, s.project_title)}
-              disabled={deleting === s.id}
-              className="shrink-0 mx-2 text-xs border border-destructive/40 px-2.5 py-1 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-            >
-              {deleting === s.id ? t("admin.deleting") : t("admin.delete")}
-            </button>
+            {canDelete && (
+              <button
+                onClick={() => handleDelete(s.id, s.project_title)}
+                disabled={deleting === s.id}
+                className="shrink-0 mx-2 text-xs border border-destructive/40 px-2.5 py-1 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+              >
+                {deleting === s.id ? t("admin.deleting") : t("admin.delete")}
+              </button>
+            )}
           </div>
 
           {expanded === s.id && (

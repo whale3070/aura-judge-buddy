@@ -16,7 +16,9 @@ import FileSelector from "@/components/FileSelector";
 import ModelSelector from "@/components/ModelSelector";
 import BatchControls from "@/components/BatchControls";
 import ReportCard from "@/components/ReportCard";
+import AuditIndeterminateProgress from "@/components/AuditIndeterminateProgress";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
+import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -101,7 +103,10 @@ export default function Index() {
   };
 
   const runSingleAudit = async () => {
-    if (!selectedFile || selectedModels.length === 0) return;
+    if (!selectedFile || selectedModels.length === 0) {
+      toast.error(t("judge.selectFileAndModels"));
+      return;
+    }
     setRunning(true);
     const id = crypto.randomUUID();
     addReport({ id, fileName: selectedFile, avgScore: null, statusText: "RUNNING", reports: [], open: true });
@@ -357,6 +362,14 @@ export default function Index() {
             {running ? t("judge.singleRunning") : t("judge.singleBtn")}
           </button>
         </div>
+        {running && (
+          <div className="mb-4 border border-primary/35 bg-primary/[0.06] px-4 py-3 shadow-[0_0_16px_hsl(var(--primary)/0.12)]">
+            <AuditIndeterminateProgress
+              title={t("judge.singleProgressTitle")}
+              hint={t("judge.singleProgressHint", { n: String(selectedModels.length) })}
+            />
+          </div>
+        )}
         <div className="flex gap-3 mb-2">
           <button
             onClick={runBatchAudit}
