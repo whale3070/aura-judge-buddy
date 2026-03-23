@@ -20,7 +20,12 @@ serve(async (req) => {
       });
     }
 
-    const res = await fetch("http://198.55.109.102:8888/api/submissions", {
+    const reqUrl = new URL(req.url);
+    const roundId = reqUrl.searchParams.get("round_id");
+    const backend = new URL("http://198.55.109.102:8888/api/submissions");
+    if (roundId) backend.searchParams.set("round_id", roundId);
+
+    const res = await fetch(backend.toString(), {
       headers: { "X-Admin-Wallet": adminWallet },
     });
 
@@ -31,13 +36,21 @@ serve(async (req) => {
       });
     }
 
-    const submissions = await res.json();
+    const raw = await res.json();
+    // Go/Gin 可能对 nil slice 编码为 JSON null；builder 筛选无结果时也可能为 null
+    const submissions = Array.isArray(raw)
+      ? raw
+      : (raw && typeof raw === "object" && Array.isArray((raw as { submissions?: unknown }).submissions)
+        ? (raw as { submissions: unknown[] }).submissions
+        : []);
     const titleMap: Record<string, string> = {};
 
     for (const sub of submissions) {
-      if (sub.md_files && Array.isArray(sub.md_files) && sub.project_title) {
-        for (const file of sub.md_files) {
-          titleMap[file] = sub.project_title;
+      if (!sub || typeof sub !== "object") continue;
+      const s = sub as { md_files?: unknown; project_title?: string };
+      if (s.md_files && Array.isArray(s.md_files) && s.project_title) {
+        for (const file of s.md_files) {
+          if (typeof file === "string") titleMap[file] = s.project_title;
         }
       }
     }

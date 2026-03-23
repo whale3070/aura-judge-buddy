@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { API_BASE } from "@/lib/apiClient";
+import { API_BASE, withRoundQuery } from "@/lib/apiClient";
 
 interface Props {
   fileName: string;
+  /** 与裁决轮次一致，否则多轮次时 /api/file-content 会落到默认 round */
+  roundId?: string | null;
 }
 
-export default function DocumentPanel({ fileName }: Props) {
+export default function DocumentPanel({ fileName, roundId }: Props) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -18,15 +20,20 @@ export default function DocumentPanel({ fileName }: Props) {
   useEffect(() => {
     if (!showPreview || !isMd) return;
     setLoading(true);
-    fetch(`${API_BASE}/api/file-content?file=${encodeURIComponent(fileName)}`)
+    fetch(
+      `${API_BASE}${withRoundQuery(`/api/file-content?file=${encodeURIComponent(fileName)}`, roundId)}`
+    )
       .then((r) => (r.ok ? r.text() : Promise.reject("无法获取文件内容")))
       .then(setContent)
       .catch(() => setContent("_⚠️ 无法加载文件内容_"))
       .finally(() => setLoading(false));
-  }, [showPreview, fileName, isMd]);
+  }, [showPreview, fileName, isMd, roundId]);
 
   const handleDownload = () => {
-    window.open(`${API_BASE}/api/file-content?file=${encodeURIComponent(fileName)}&download=1`, "_blank");
+    window.open(
+      `${API_BASE}${withRoundQuery(`/api/file-content?file=${encodeURIComponent(fileName)}&download=1`, roundId)}`,
+      "_blank"
+    );
   };
 
   return (
@@ -70,7 +77,7 @@ export default function DocumentPanel({ fileName }: Props) {
           )}
           {!loading && isPdf && (
             <iframe
-              src={`${API_BASE}/api/file-content?file=${encodeURIComponent(fileName)}`}
+              src={`${API_BASE}${withRoundQuery(`/api/file-content?file=${encodeURIComponent(fileName)}`, roundId)}`}
               className="w-full h-[500px] border border-border/30 bg-background"
               title={fileName}
             />

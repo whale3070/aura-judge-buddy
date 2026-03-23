@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 
 export default function Landing() {
@@ -54,27 +53,6 @@ export default function Landing() {
             </ol>
             <p className="text-sm text-muted-foreground mt-3">{t("landing.afterSubmitNote")}</p>
           </section>
-
-          <div className="flex flex-wrap gap-4 justify-center pt-6 border-t border-border">
-            <Link
-              to="/submit"
-              className="inline-flex items-center justify-center bg-primary text-primary-foreground font-bold px-8 py-4 text-sm tracking-wider hover:shadow-[0_0_20px_hsl(var(--primary)/0.6)] transition-all"
-            >
-              {t("landing.submitBtn")}
-            </Link>
-            <Link
-              to="/ranking"
-              className="inline-flex items-center justify-center border-2 border-primary/50 text-primary font-bold px-8 py-4 text-sm tracking-wider hover:bg-primary/10 transition-all"
-            >
-              {t("landing.rankingBtn")}
-            </Link>
-          </div>
-
-          <div className="mt-6 text-center">
-            <Link to="/judge" className="text-xs text-muted-foreground hover:text-primary transition-colors">
-              {t("landing.judgeLink")}
-            </Link>
-          </div>
         </div>
       </div>
     </div>

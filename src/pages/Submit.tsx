@@ -1,30 +1,28 @@
 import { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { MODELS } from "@/lib/prompts";
-import { API_BASE } from "@/lib/apiClient";
+import { API_BASE, roundNavSuffix, sanitizeRoundIdParam } from "@/lib/apiClient";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 
 interface SubmissionForm {
   project_title: string;
+  github_url: string;
   one_liner: string;
   problem: string;
   solution: string;
-  why_this_chain: string;
-  github_url: string;
   demo_url: string;
   docs_text: string;
 }
 
 const EMPTY_FORM: SubmissionForm = {
   project_title: "",
+  github_url: "",
   one_liner: "",
   problem: "",
   solution: "",
-  why_this_chain: "",
-  github_url: "",
   demo_url: "",
   docs_text: "",
 };
@@ -41,6 +39,8 @@ const DEFAULT_SUBMIT_PROMPT = "Score strictly based on rules. Pay special attent
 export default function Submit() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const roundIdRequired = sanitizeRoundIdParam(searchParams.get("round_id"));
   const [form, setForm] = useState<SubmissionForm>(EMPTY_FORM);
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -57,6 +57,12 @@ export default function Submit() {
     MODELS.filter((m) => m.defaultChecked).map((m) => m.id)
   );
   const [customPrompt, setCustomPrompt] = useState(DEFAULT_SUBMIT_PROMPT);
+
+  if (!roundIdRequired) {
+    return <Navigate to="/rounds" replace />;
+  }
+
+  const navSuffix = roundNavSuffix(roundIdRequired);
 
   const set = (field: keyof SubmissionForm) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -114,11 +120,12 @@ export default function Submit() {
 
   const validate = (): string | null => {
     if (!form.project_title.trim()) return t("submit.validateTitle");
+    const gh = form.github_url.trim();
+    if (!gh) return t("submit.validateGithubMissing");
+    if (!/^https?:\/\/.+/i.test(gh)) return t("submit.validateGithub");
+    if (!/github\.com/i.test(gh)) return t("submit.validateGithubHost");
     if (form.one_liner.length > 200) return t("submit.validateOneLinerLen");
-    if (!form.github_url.trim()) return t("submit.validateGithub");
-    if (!/^https?:\/\/.+/.test(form.github_url))
-      return t("submit.validateGithub");
-    if (form.demo_url && !/^https?:\/\/.+/.test(form.demo_url))
+    if (form.demo_url.trim() && !/^https?:\/\/.+/i.test(form.demo_url.trim()))
       return t("submit.validateDemo");
     return null;
   };
@@ -132,8 +139,18 @@ export default function Submit() {
     setSubmitting(true);
 
     const fd = new FormData();
-    Object.entries(form).forEach(([k, v]) => {
-      if (v) fd.append(k, v);
+    fd.append("project_title", form.project_title.trim());
+    fd.append("github_url", form.github_url.trim());
+    const optional: [keyof SubmissionForm, string][] = [
+      ["one_liner", form.one_liner],
+      ["problem", form.problem],
+      ["solution", form.solution],
+      ["demo_url", form.demo_url],
+      ["docs_text", form.docs_text],
+    ];
+    optional.forEach(([k, v]) => {
+      const s = v.trim();
+      if (s) fd.append(k, s);
     });
     files.forEach((f) => fd.append("files", f));
 
@@ -147,6 +164,7 @@ export default function Submit() {
         fd.append("project_keywords", JSON.stringify(keywords));
       }
     }
+    fd.append("round_id", roundIdRequired);
 
     try {
       const res = await fetch(`${API_BASE}/api/submit`, {
@@ -161,7 +179,8 @@ export default function Submit() {
       setLastSubmissionId(submissionId ?? null);
       toast.success(t("submit.submitSuccess"));
       if (submissionId) {
-        navigate(`/my-submission/${submissionId}`);
+        const q = `?round_id=${encodeURIComponent(roundIdRequired)}`;
+        navigate(`/my-submission/${submissionId}${q}`);
       }
     } catch (e: any) {
       toast.error(e?.message || t("submit.submitFail"));
@@ -178,26 +197,30 @@ export default function Submit() {
       <div className="max-w-[800px] mx-auto border border-primary/40 p-8 shadow-[0_0_30px_hsl(var(--primary)/0.1)] bg-card relative">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
           <div className="flex items-center gap-2">
-            <Link to="/submit" className="text-xs text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-1.5">
+            <Link to="/" className="text-xs text-muted-foreground hover:text-primary transition-colors border border-border px-3 py-1.5">
               {t("nav.home")}
             </Link>
             <LanguageToggle />
           </div>
           <div className="flex gap-2">
-            <Link to="/ranking" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
+            <Link to={`/ranking${navSuffix}`} className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
               {t("nav.ranking")}
             </Link>
-            <Link to="/judge" className="text-xs border border-primary/40 px-3 py-1.5 text-primary hover:bg-primary/10 transition-colors">
+            <Link to={`/judge${navSuffix}`} className="text-xs border border-primary/40 px-3 py-1.5 text-primary hover:bg-primary/10 transition-colors">
               {t("nav.judge")}
             </Link>
           </div>
+        </div>
+
+        <div className="mb-4 px-3 py-2 border border-accent/30 bg-accent/5 text-xs text-muted-foreground">
+          <span className="text-accent font-bold">{t("submit.roundBanner", { id: roundIdRequired })}</span>
         </div>
 
         {lastSubmissionId && (
           <div className="mb-6 p-4 bg-primary/10 border border-primary/40 rounded">
             <p className="text-sm text-foreground/90 mb-2">✅ {t("submit.successMsg")} <strong>{t("submit.successMin")}</strong> {t("submit.successWait")}</p>
             <Link
-              to={`/my-submission/${lastSubmissionId}`}
+              to={`/my-submission/${lastSubmissionId}?round_id=${encodeURIComponent(roundIdRequired)}`}
               className="inline-flex items-center text-sm font-bold text-primary hover:underline"
             >
               {t("submit.viewMyProject")}
@@ -214,38 +237,34 @@ export default function Submit() {
 
         <SectionLabel index={1} text={t("submit.section1")} />
 
-        <FieldRow label={t("submit.projectTitle")} hint="project_title">
+        <FieldRow label={t("submit.projectTitle")} hint="project_title *">
           <input value={form.project_title} onChange={set("project_title")} placeholder={t("submit.projectTitlePlaceholder")} className="field-input" />
         </FieldRow>
 
-        <FieldRow label={t("submit.oneLiner")} hint="one_liner · ≤200">
-          <input value={form.one_liner} onChange={set("one_liner")} maxLength={200} placeholder={t("submit.oneLinerPlaceholder")} className="field-input" />
-          <div className="text-right text-[10px] text-muted-foreground mt-0.5">{form.one_liner.length}/200</div>
-        </FieldRow>
-
-        <FieldRow label={t("submit.problem")} hint="problem">
-          <textarea value={form.problem} onChange={set("problem")} rows={3} placeholder={t("submit.problemPlaceholder")} className="field-input resize-y" />
-        </FieldRow>
-
-        <FieldRow label={t("submit.solution")} hint="solution">
-          <textarea value={form.solution} onChange={set("solution")} rows={3} placeholder={t("submit.solutionPlaceholder")} className="field-input resize-y" />
+        <FieldRow label={t("submit.githubUrl")} hint="github_url *">
+          <input value={form.github_url} onChange={set("github_url")} placeholder="https://github.com/your-org/your-repo" className="field-input" />
         </FieldRow>
 
         <SectionLabel index={2} text={t("submit.section2")} />
 
-        <FieldRow label={t("submit.whyChain")} hint="why_this_chain">
-          <textarea value={form.why_this_chain} onChange={set("why_this_chain")} rows={2} placeholder={t("submit.whyChainPlaceholder")} className="field-input resize-y" />
+        <FieldRow label={t("submit.oneLiner")} hint="one_liner · ≤200 · optional">
+          <input value={form.one_liner} onChange={set("one_liner")} maxLength={200} placeholder={t("submit.oneLinerPlaceholder")} className="field-input" />
+          <div className="text-right text-[10px] text-muted-foreground mt-0.5">{form.one_liner.length}/200</div>
         </FieldRow>
 
-        <FieldRow label={t("submit.githubUrl")} hint="github_url">
-          <input value={form.github_url} onChange={set("github_url")} placeholder="https://github.com/your-org/your-repo" className="field-input" />
+        <FieldRow label={t("submit.problem")} hint="problem · optional">
+          <textarea value={form.problem} onChange={set("problem")} rows={3} placeholder={t("submit.problemPlaceholder")} className="field-input resize-y" />
         </FieldRow>
 
-        <FieldRow label={t("submit.demoUrl")} hint="demo_url">
+        <FieldRow label={t("submit.solution")} hint="solution · optional">
+          <textarea value={form.solution} onChange={set("solution")} rows={3} placeholder={t("submit.solutionPlaceholder")} className="field-input resize-y" />
+        </FieldRow>
+
+        <FieldRow label={t("submit.demoUrl")} hint="demo_url · optional">
           <input value={form.demo_url} onChange={set("demo_url")} placeholder="https://your-demo.app" className="field-input" />
         </FieldRow>
 
-        <FieldRow label={t("submit.docsText")} hint="docs_text">
+        <FieldRow label={t("submit.docsText")} hint="docs_text · optional">
           <textarea value={form.docs_text} onChange={set("docs_text")} rows={4} placeholder={t("submit.docsTextPlaceholder")} className="field-input resize-y" />
         </FieldRow>
 

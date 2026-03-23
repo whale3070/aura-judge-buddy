@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import type { RankingItem } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import STierDuelPanel from "@/components/STierDuelPanel";
 import { letterTierFromReports, type LetterTier } from "@/lib/dimensionTier";
+import { syncDuelBracketFromServer } from "@/lib/duelBracketRemote";
 
 interface TierConfig {
   tier: LetterTier;
@@ -19,7 +20,7 @@ const TIER_ORDER: LetterTier[] = ["S", "A", "B", "C", "D", "?"];
 const TIER_META: Record<LetterTier, Omit<TierConfig, "tier">> = {
   S: {
     label: "S",
-    desc: "五维均 ≥18（满分 20）",
+    desc: "≥4 维 ≥18（满分 20，阶梯互斥）",
     color: "text-primary",
     bgClass: "bg-primary/10",
     borderClass: "border-primary/40",
@@ -27,7 +28,7 @@ const TIER_META: Record<LetterTier, Omit<TierConfig, "tier">> = {
   },
   A: {
     label: "A",
-    desc: "至少三维 ≥15",
+    desc: "≥3 维 ≥16",
     color: "text-secondary",
     bgClass: "bg-secondary/10",
     borderClass: "border-secondary/40",
@@ -35,7 +36,7 @@ const TIER_META: Record<LetterTier, Omit<TierConfig, "tier">> = {
   },
   B: {
     label: "B",
-    desc: "至少二维 ≥12",
+    desc: "≥2 维 ≥14",
     color: "text-warning",
     bgClass: "bg-[hsl(var(--warning)/0.1)]",
     borderClass: "border-[hsl(var(--warning)/0.4)]",
@@ -43,7 +44,7 @@ const TIER_META: Record<LetterTier, Omit<TierConfig, "tier">> = {
   },
   C: {
     label: "C",
-    desc: "至少一维 ≥12",
+    desc: "≥1 维 ≥12",
     color: "text-orange-400",
     bgClass: "bg-orange-500/10",
     borderClass: "border-orange-500/30",
@@ -51,7 +52,7 @@ const TIER_META: Record<LetterTier, Omit<TierConfig, "tier">> = {
   },
   D: {
     label: "D",
-    desc: "无一维 ≥12",
+    desc: "五维均 ＜12",
     color: "text-destructive",
     bgClass: "bg-destructive/10",
     borderClass: "border-destructive/40",
@@ -80,11 +81,19 @@ interface Props {
   titleMap: Record<string, string>;
   /** 管理员钱包地址，用于调用 /api/duel */
   adminWallet?: string | null;
+  /** 与 URL ?round_id= 一致，拉取 judge-result / file-content 时用 */
+  roundId?: string | null;
 }
 
-export default function GradeRankingPanel({ rankings, loading, titleMap, adminWallet }: Props) {
+export default function GradeRankingPanel({ rankings, loading, titleMap, adminWallet, roundId }: Props) {
   const [expandedTier, setExpandedTier] = useState<LetterTier | null>("S");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  useEffect(() => {
+    const rid = (roundId ?? "").trim();
+    if (!rid) return;
+    void syncDuelBracketFromServer(rid);
+  }, [roundId]);
 
   const mergedProjects = useMemo(() => {
     const projectMap = new Map<string, MergedProject>();
@@ -117,13 +126,16 @@ export default function GradeRankingPanel({ rankings, loading, titleMap, adminWa
     return groups;
   }, [mergedProjects]);
 
-  const sTierOptions = useMemo(
+  const duelCandidates = useMemo(
     () =>
-      tierGroups.S.map((p) => ({
-        file_name: p.item.file_name,
-        title: p.title,
-      })),
-    [tierGroups.S]
+      mergedProjects
+        .filter((p) => p.tier === "S" || p.tier === "A" || p.tier === "B")
+        .map((p) => ({
+          file_name: p.item.file_name,
+          title: p.title,
+          tier: p.tier as "S" | "A" | "B",
+        })),
+    [mergedProjects]
   );
 
   const toggleTier = (g: LetterTier) => {
@@ -157,7 +169,12 @@ export default function GradeRankingPanel({ rankings, loading, titleMap, adminWa
         </div>
       </div>
 
-      <STierDuelPanel projects={sTierOptions} adminWallet={adminWallet ?? ""} enabled={duelEnabled} />
+      <STierDuelPanel
+        candidates={duelCandidates}
+        adminWallet={adminWallet ?? ""}
+        enabled={duelEnabled}
+        roundId={roundId}
+      />
 
       {TIER_ORDER.map((tier) => {
         const projects = tierGroups[tier];
@@ -225,7 +242,11 @@ export default function GradeRankingPanel({ rankings, loading, titleMap, adminWa
 
                           {isSelected && (
                             <div className="px-4 pb-4">
-                              <JudgeDetail fileName={p.item.file_name} onClose={() => setSelectedFile(null)} />
+                              <JudgeDetail
+                                fileName={p.item.file_name}
+                                roundId={roundId}
+                                onClose={() => setSelectedFile(null)}
+                              />
                             </div>
                           )}
                         </div>

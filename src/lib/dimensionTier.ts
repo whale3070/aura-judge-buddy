@@ -74,22 +74,21 @@ export function averageFiveDims(reports: Pick<AuditReport, "content" | "error">[
 }
 
 /**
- * S：五维均 ≥18
- * A：至少三维 ≥15
- * B：至少二维 ≥12
- * C：至少一维 ≥12
- * D：无一维 ≥12
- * 优先级自上而下。
+ * 阶梯互斥定档（五维满分 20，先匹配高等级即停止）：S → A → B → C → D
+ * - S：≥4 个维度 ≥18
+ * - A：≥3 个维度 ≥16
+ * - B：≥2 个维度 ≥14
+ * - C：≥1 个维度 ≥12
+ * - D：五维均 ＜12
  */
 export function letterTierFromAveragedDims(avg: Record<FiveDimKeyZh, number> | null): LetterTier {
   if (!avg) return "?";
   const scores = FIVE_DIM_KEYS_ZH.map((k) => avg[k]);
-  if (scores.every((s) => s >= 18)) return "S";
-  const ge15 = scores.filter((s) => s >= 15).length;
-  if (ge15 >= 3) return "A";
-  const ge12 = scores.filter((s) => s >= 12).length;
-  if (ge12 >= 2) return "B";
-  if (ge12 >= 1) return "C";
+  const countGe = (t: number) => scores.filter((s) => s >= t).length;
+  if (countGe(18) >= 4) return "S";
+  if (countGe(16) >= 3) return "A";
+  if (countGe(14) >= 2) return "B";
+  if (countGe(12) >= 1) return "C";
   return "D";
 }
 

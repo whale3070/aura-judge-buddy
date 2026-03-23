@@ -3,28 +3,330 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
-    <title>Lovable App</title>
-    <meta name="description" content="Lovable Generated Project">
-    <meta name="author" content="Lovable" />
+    <title>Aura Judgement System</title>
+    <meta name="description" content="Aura — hackathon project pre-review and multi-model audit with versioned YAML rules." />
+    <meta name="author" content="Aura" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    
-    
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/favicon-32.png" />
+
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e64c89dc-47e6-4005-bab8-c1f06aa41a87/id-preview-037abfc1--31ef7bb2-b70c-4ff8-888f-6490aecb589c.lovable.app-1772386470635.png">
+    <meta property="og:title" content="Aura Judgement System" />
+    <meta property="og:description" content="Hackathon pre-review, versioned rules, and auditable AI scoring." />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@Lovable" />
-    <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e64c89dc-47e6-4005-bab8-c1f06aa41a87/id-preview-037abfc1--31ef7bb2-b70c-4ff8-888f-6490aecb589c.lovable.app-1772386470635.png">
-    <meta property="og:title" content="Lovable App">
-  <meta name="twitter:title" content="Lovable App">
-  <meta property="og:description" content="Lovable Generated Project">
-  <meta name="twitter:description" content="Lovable Generated Project">
-</head>
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Aura Judgement System" />
+    <meta name="twitter:description" content="Hackathon pre-review, versioned rules, and auditable AI scoring." />
+
+    <style>
+      #polkadot-result-article {
+        max-width: 56rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.25rem 4rem;
+        font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 0.9375rem;
+        line-height: 1.7;
+        color: #e4e4e7;
+        background: #09090b;
+        border-top: 1px solid rgba(161, 161, 170, 0.35);
+      }
+      #polkadot-result-article h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1.35;
+        margin: 0 0 1rem;
+        color: #fafafa;
+      }
+      #polkadot-result-article h2 {
+        font-size: 1.125rem;
+        font-weight: 700;
+        margin: 2rem 0 0.75rem;
+        padding-left: 0.75rem;
+        border-left: 4px solid #22c55e;
+        color: #fafafa;
+      }
+      #polkadot-result-article h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 1.25rem 0 0.5rem;
+        color: #fafafa;
+      }
+      #polkadot-result-article p,
+      #polkadot-result-article li {
+        color: #d4d4d8;
+      }
+      #polkadot-result-article a {
+        color: #4ade80;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      #polkadot-result-article a:hover {
+        color: #86efac;
+      }
+      #polkadot-result-article hr {
+        border: none;
+        border-top: 1px solid rgba(161, 161, 170, 0.35);
+        margin: 1.75rem 0;
+      }
+      #polkadot-result-article ul,
+      #polkadot-result-article ol {
+        padding-left: 1.25rem;
+        margin: 0.5rem 0 1rem;
+      }
+      #polkadot-result-article li {
+        margin: 0.35rem 0;
+      }
+      #polkadot-result-article .table-wrap {
+        overflow-x: auto;
+        margin: 1rem 0;
+        -webkit-overflow-scrolling: touch;
+      }
+      #polkadot-result-article table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8125rem;
+      }
+      #polkadot-result-article th,
+      #polkadot-result-article td {
+        border: 1px solid rgba(161, 161, 170, 0.4);
+        padding: 0.5rem 0.6rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      #polkadot-result-article th {
+        background: rgba(39, 39, 42, 0.9);
+        color: #fafafa;
+        font-weight: 600;
+      }
+      #polkadot-result-article .note {
+        font-size: 0.8125rem;
+        color: #a1a1aa;
+        margin-top: 0.5rem;
+      }
+      #polkadot-result-article strong {
+        color: #fafafa;
+        font-weight: 600;
+      }
+      #polkadot-result-article code {
+        font-size: 0.85em;
+        background: rgba(39, 39, 42, 0.95);
+        padding: 0.12em 0.4em;
+        border-radius: 4px;
+        border: 1px solid rgba(161, 161, 170, 0.35);
+      }
+      #polkadot-result-article .thesis {
+        border-left: 4px solid #22c55e;
+        padding: 0.85rem 1rem;
+        background: rgba(34, 197, 94, 0.09);
+        margin: 0 0 1.25rem;
+        color: #e4e4e7;
+      }
+      #polkadot-result-article .thesis strong:first-of-type {
+        color: #86efac;
+      }
+    </style>
+  </head>
 
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <article id="polkadot-result-article" lang="zh-CN">
+      <h1>从昙花一现到长效落地：Aura 系统重构黑客松项目评估逻辑——基于实测项目数据的对比分析</h1>
+
+      <p><strong>数据出处（可核验）</strong></p>
+      <ul>
+        <li>
+          公开排名页：
+          <a
+            href="http://198.55.109.102:3000/ranking?round_id=polkadot-mini-hackathon-2026-03"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Aura 项目排名 · polkadot-mini-hackathon-2026-03</a>
+          （<code>round_id=polkadot-mini-hackathon-2026-03</code>）
+        </li>
+        <li>
+          说明：下列五维分数与档位与导出当时的存证一致；若后台规则版本或评审结果更新，请以页面与 <code>judge-result</code> 目录中的存证为准。本文结论仅针对上述样本与时间截面，不向其他赛事或未观测项目外推。
+        </li>
+      </ul>
+
+      <hr />
+
+      <p>
+        在区块链及开源技术黑客松赛事中，“参赛即巅峰、赛后即弃坑”是常见现象：许多项目在 Demo 与颁奖后投入下降，长期落地与商业化不足。本文基于本次
+        <strong>Aura AI 量化评估</strong>与<strong>人工评委评选</strong>的并行结果，对照项目分数、档位与奖项归属，讨论两套标准之间的差异，以及 Aura 能在何种意义上补充人工评审的信息维度。
+      </p>
+
+      <h2>一、基础数据说明：评估对象与核心维度</h2>
+      <p>本次分析样本为 whale3070 账号下 <strong>13 个</strong>黑客松参赛项目，对应两套视角：</p>
+      <ol>
+        <li>
+          <strong>Aura AI 评估</strong>
+          <ul>
+            <li>
+              维度：<strong>创新性、技术实现、商业价值、用户体验、落地可行性</strong>（五维，单维 <strong>0–20</strong> 分，多模型结果取算术平均）。
+            </li>
+            <li>
+              <strong>档位</strong>：线上按五维解析结果划分为 <strong>S / A / B / C / D / ?</strong>（<code>?</code> 表示五维未完整解析）。下表仅列出样本中出现的
+              <strong>A / B / D</strong>，不代表 Aura 仅有这三档。
+            </li>
+            <li>
+              <strong>五维合计</strong>：下表「五维合计/100」为五维分数相加（每维满分 20）。排名页另有从评审正文解析的 <strong>0–100</strong> 均分（<code>avg_score</code>），与五维之和是不同指标，对照时勿混用。
+            </li>
+          </ul>
+        </li>
+        <li>
+          <strong>人工评委评选</strong> — 综合权衡亮点、Demo、主题贴合度等，产生综合前三甲、最佳开发团队奖、最勤劳开发者等；<strong>无</strong>与 Aura 逐项对齐的固定量化标尺。
+        </li>
+        <li>
+          <strong>分析边界</strong> — 人工评审若更侧重现场展示与叙事，文档侧的商业与落地信号在结果中的权重可能相对较低；这一判断仅用于解释<strong>本批数据中的结构差异</strong>，不推广为对所有评委或赛事的定性。
+        </li>
+      </ol>
+
+      <h3>核心样本数据汇总（关键项目量化得分）</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>项目名称</th>
+              <th>Aura 档位*</th>
+              <th>创新性</th>
+              <th>技术实现</th>
+              <th>商业价值</th>
+              <th>用户体验</th>
+              <th>落地可行性</th>
+              <th>五维合计/100**</th>
+              <th>人工评选结果</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>FireflyQR</td>
+              <td>A</td>
+              <td>18.0</td>
+              <td>17.0</td>
+              <td>18.0</td>
+              <td>17.0</td>
+              <td>19.0</td>
+              <td>89.0</td>
+              <td>最佳开发团队奖</td>
+            </tr>
+            <tr>
+              <td>human-ai-battle</td>
+              <td>A</td>
+              <td>18.0</td>
+              <td>16.5</td>
+              <td>13.5</td>
+              <td>16.0</td>
+              <td>13.5</td>
+              <td>77.5</td>
+              <td>综合冠军</td>
+            </tr>
+            <tr>
+              <td>Polk2.0-Revive-Hackathon-Lifepp（life++）</td>
+              <td>A</td>
+              <td>17.0</td>
+              <td>18.0</td>
+              <td>16.0</td>
+              <td>17.0</td>
+              <td>18.0</td>
+              <td>86.0</td>
+              <td>综合亚军</td>
+            </tr>
+            <tr>
+              <td>Subvote</td>
+              <td>A</td>
+              <td>17.0</td>
+              <td>13.5</td>
+              <td>16.0</td>
+              <td>16.0</td>
+              <td>14.5</td>
+              <td>77.0</td>
+              <td>综合季军</td>
+            </tr>
+            <tr>
+              <td>Willbook</td>
+              <td>B</td>
+              <td colspan="5">（原稿未公示各维）</td>
+              <td>（原稿未公示）</td>
+              <td>最勤劳开发者（提名）、未进三甲</td>
+            </tr>
+            <tr>
+              <td>1886_pixi-ace-air-combat</td>
+              <td>D</td>
+              <td colspan="5">（原稿未公示各维）</td>
+              <td>（原稿未公示）</td>
+              <td>直接淘汰、无任何奖项</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        * 档位以 Aura <strong>五维分档规则</strong>为准，完整阶梯含 S/A/B/C/D/?，见排名页说明。<br />
+        ** 五维合计 = 五维分数相加（每维满分 20）。
+      </p>
+
+      <hr />
+
+      <h2>二、核心结论一：人工评选与量化排名存在明显错位</h2>
+      <p>
+        <strong>结论</strong>：在本批样本中，<strong>人工综合名次与 Aura 五维合计排名不一致</strong>：综合三甲<strong>并非</strong>按五维合计分从高到低排列；五维合计领先的项目未进入综合前三，而评委对展示与叙事突出的项目给予了更高名次。与此同时，<strong>人工排序也不宜等同于「五维实力排名」</strong>——两套标准衡量的侧重点不同。
+      </p>
+      <ol>
+        <li>
+          <strong>量化合计领先者未进入人工综合前三</strong> — FireflyQR 五维合计 89.0，落地可行性 19.0、商业价值 18.0，为表中五维合计最高，但人工结果为「最佳开发团队奖」，未列入综合三甲。人工冠军 human-ai-battle 五维合计 77.5，商业与落地均为 13.5，与 FireflyQR 差距明显。由此可见，<strong>人工综合排序未按 Aura 五维合计分对齐</strong>。
+        </li>
+        <li>
+          <strong>人工前三与五维合计次序交叉</strong> — life++ 五维合计 86.0，高于冠军 77.5，仍居亚军；Subvote 合计 77.0，技术实现 13.5，为季军。说明在本批数据中，<strong>人工给出的名次顺序与五维合计高低并不一致</strong>，也不宜将人工名次直接解读为「纯噱头导向」——更准确的说法是：<strong>人工排序 ≠ 五维合计排序</strong>。
+        </li>
+        <li>
+          <strong>粗筛结果与 Aura 档位存在对应</strong> — D 档的 1886_pixi-ace-air-combat 未获任何奖项；B 档 Willbook 未进综合三甲。说明在<strong>是否入围核心奖项</strong>这一层面，低档位与边缘化结果有一定重合；<strong>综合三甲的排序规则</strong>则与五维合计分脱钩，两套机制可以并行对照，而非相互替代。
+        </li>
+      </ol>
+
+      <hr />
+
+      <h2>三、核心结论二：评选导向与赛后行为</h2>
+      <p>
+        若赛事公开信号更强调短期 Demo 与现场叙事，团队在商业闭环与持续交付上的激励可能相对减弱；<strong>赛后是否继续投入</strong>还取决于奖金、维护成本、团队规划等因素，<strong>本分析不将其归结为单一原因</strong>。
+      </p>
+      <ol>
+        <li>
+          <strong>human-ai-battle、Subvote</strong> 的商业价值与落地可行性在五维上相对偏低；若缺乏后续投入与变现路径，从量化结果看<strong>长期维护风险较高</strong>。这是基于分值的陈述，不构成对团队行为的预测。
+        </li>
+        <li>
+          <strong>FireflyQR</strong> 在五维上更均衡且商业、落地更高，但未进入综合三甲，仅获团队类奖项；就<strong>名次与量化结果的对应关系</strong>而言，存在<strong>排序与资源曝光不完全匹配</strong>的现象。
+        </li>
+        <li>
+          关于「赛后是否停更、是否构成行业常态」等问题，<strong>本文不作结论</strong>：缺乏对 13 个项目赛后仓库与版本的持续追踪数据，任何外推都超出本文证据范围。
+        </li>
+      </ol>
+
+      <hr />
+
+      <h2>四、核心结论三：Aura 能力与产品边界</h2>
+      <ol>
+        <li>
+          <strong>当前已实现能力</strong> — 从 README 与存证解析五维、多模型平均、<strong>S/A/B/C/D/? 分档</strong>；排名页支持<strong>规则版本筛选</strong>，可与管理员控制台口径对齐。<strong>擂台两两对决</strong>结果可保存在浏览器并同步至服务端（<code>submissions/&lt;round_id&gt;/.aura_duel_bracket_snapshot.json</code>），用于同档内展示顺序与对决说明；<strong>精排仍以赛事规则与人工为准</strong>，Aura 提供可复核的文档侧量化与可选擂台记录。
+        </li>
+        <li>
+          <strong>权重方案（路线图，非默认配置）</strong> — 业界讨论中可能出现的「技术落地 40%、商业价值 35%」等加权设想，属于<strong>产品与赛制设计选项</strong>，<strong>不是</strong>当前 Aura 线上默认逻辑；现行以<strong>五维达标阶梯</strong>划档为主。
+        </li>
+        <li>
+          <strong>资源与闭环</strong> — 投资对接、流量与生态扶持属于<strong>运营与生态层</strong>工作；Aura 输出的是<strong>可审计的量化与分档</strong>，可作为资源分配与复盘时的<strong>输入之一</strong>，本身不替代商务或运营决策。
+        </li>
+        <li>
+          <strong>人机分工</strong> — 较贴近现状的用法是：<strong>Aura 承担文档与规则口径下的大范围筛选与对照</strong>，<strong>人工在既定赛道与叙事维度上作最终权衡</strong>，二者并列使用而非互相取消。
+        </li>
+      </ol>
+
+      <hr />
+
+      <h2>五、总结</h2>
+      <p>
+        在本批 Polkadot 迷你黑客松样本中，人工综合名次与 Aura 五维合计排名<strong>明显错位</strong>，但二者侧重不同，宜对照阅读而非简单对立。Aura 以<strong>文档与存证驱动的五维量化与分档</strong>提供可复核依据；其合理定位是<strong>数据与流程层工具</strong>，与人工评审、赛事规则及后续运营配合。超出本文样本、时间与数据范围之外的推断，均应保持克制。
+      </p>
+    </article>
   </body>
 </html>

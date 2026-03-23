@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   fetchFilesAPI,
   submitAuditAPI,
@@ -10,6 +10,8 @@ import {
   type AuditReport,
   type SavedResult,
   type RuleVersionMeta,
+  effectiveRoundIdFromSearchParam,
+  roundNavSuffix,
 } from "@/lib/apiClient";
 import JudgeDetail from "@/components/JudgeDetail";
 import RankingTable from "@/components/RankingTable";
@@ -26,8 +28,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  DEFAULT_RANKING_RULE_ID,
+  LEGACY_RULE_FILTER_VALUE,
   buildRuleFilterOptions,
+  computeDefaultRuleFilterId,
   filterRankingsByRule,
 } from "@/lib/rankingRuleFilter";
 
@@ -58,6 +61,10 @@ function extractAvgScore(reports: AuditReport[]): number | null {
 
 export default function Index() {
   const { t } = useI18n();
+  const [searchParams] = useSearchParams();
+  const roundQ = searchParams.get("round_id");
+  const effectiveRound = effectiveRoundIdFromSearchParam(roundQ);
+  const navSuffix = roundNavSuffix(roundQ);
   const [files, setFiles] = useState<string[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState("");
@@ -79,15 +86,19 @@ export default function Index() {
   const [projectKeywords, setProjectKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState("");
   const [outputLang, setOutputLang] = useState<"en" | "zh">("en");
-  const [ruleFilterId, setRuleFilterId] = useState(DEFAULT_RANKING_RULE_ID);
+  const [ruleFilterOverride, setRuleFilterOverride] = useState<string | undefined>(undefined);
   const [versionMetas, setVersionMetas] = useState<RuleVersionMeta[]>([]);
+
+  useEffect(() => {
+    setRuleFilterOverride(undefined);
+  }, [roundQ]);
 
   const loadData = useCallback(async () => {
     const [f, r, t, ver] = await Promise.all([
-      fetchFilesAPI().catch(() => []),
-      fetchRankingsAPI().catch(() => []),
-      fetchFileTitlesAPI().catch(() => ({} as Record<string, string>)),
-      fetchRuleVersionsAPI().catch(() => ({ versions: [] as RuleVersionMeta[] })),
+      fetchFilesAPI(roundQ).catch(() => []),
+      fetchRankingsAPI(roundQ).catch(() => []),
+      fetchFileTitlesAPI(roundQ).catch(() => ({} as Record<string, string>)),
+      fetchRuleVersionsAPI(roundQ).catch(() => ({ versions: [] as RuleVersionMeta[] })),
     ]);
     setFiles(f);
     if (f.length > 0) setSelectedFile(f[0]);
@@ -96,7 +107,7 @@ export default function Index() {
     setTitleMap(t);
     setVersionMetas(ver.versions ?? []);
     setRankingsLoading(false);
-  }, []);
+  }, [roundQ]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -130,6 +141,7 @@ export default function Index() {
         output_lang: outputLang,
         enable_web_search: enableWebSearch || undefined,
         project_keywords: enableWebSearch ? projectKeywords : undefined,
+        round_id: effectiveRound,
       });
       const avg = extractAvgScore(data.reports);
       removeReport(id);
@@ -148,7 +160,7 @@ export default function Index() {
         competitorResultsCount: data.competitor_results_count,
         projectKeywords: enableWebSearch ? projectKeywords : undefined,
       });
-      const r = await fetchRankingsAPI();
+      const r = await fetchRankingsAPI(roundQ);
       setRankings(r);
     } catch (err: any) {
       removeReport(id);
@@ -158,14 +170,22 @@ export default function Index() {
   };
 
   const runBatchAudit = async () => {
-    if (selectedModels.length === 0) return;
+    if (selectedModels.length === 0) {
+      toast.error(t("judge.selectFileAndModels"));
+      return;
+    }
     batchStopRef.current = false;
     setBatchRunning(true);
     let allFiles: string[] = [];
-    try { allFiles = await fetchFilesAPI(); } catch { setBatchRunning(false); return; }
+    try {
+      allFiles = await fetchFilesAPI(roundQ);
+    } catch {
+      setBatchRunning(false);
+      return;
+    }
     let analyzed = new Set<string>();
     try {
-      const r = await fetchRankingsAPI();
+      const r = await fetchRankingsAPI(roundQ);
       setRankings(r);
       analyzed = new Set(r.map((x) => x.file_name));
     } catch { /* continue */ }
@@ -194,6 +214,7 @@ export default function Index() {
             output_lang: outputLang,
             enable_web_search: enableWebSearch || undefined,
             project_keywords: enableWebSearch ? projectKeywords : undefined,
+            round_id: effectiveRound,
           });
           const avg = extractAvgScore(data.reports);
           removeReport(placeholderId);
@@ -214,7 +235,12 @@ export default function Index() {
         done++;
         setProgress({ done, total });
         if (done % 3 === 0 || done === total) {
-          try { const r = await fetchRankingsAPI(); setRankings(r); } catch { /* */ }
+          try {
+            const r = await fetchRankingsAPI(roundQ);
+            setRankings(r);
+          } catch {
+            /* */
+          }
         }
         if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
       }
@@ -229,15 +255,27 @@ export default function Index() {
       reports: [],
       open: false,
     });
-    try { const r = await fetchRankingsAPI(); setRankings(r); } catch { /* */ }
+    try {
+      const r = await fetchRankingsAPI(roundQ);
+      setRankings(r);
+    } catch {
+      /* */
+    }
   };
 
   const ruleOptions = useMemo(() => buildRuleFilterOptions(rankings, versionMetas), [rankings, versionMetas]);
 
-  const filteredRankings = useMemo(
-    () => filterRankingsByRule(rankings, ruleFilterId),
-    [rankings, ruleFilterId]
-  );
+  const effectiveRuleFilterId = useMemo(() => {
+    if (ruleOptions.length === 0) return LEGACY_RULE_FILTER_VALUE;
+    const ok = ruleFilterOverride != null && ruleOptions.some((o) => o.value === ruleFilterOverride);
+    if (ok) return ruleFilterOverride!;
+    return computeDefaultRuleFilterId(rankings, versionMetas);
+  }, [ruleFilterOverride, ruleOptions, rankings, versionMetas]);
+
+  const filteredRankings = useMemo(() => {
+    if (ruleOptions.length === 0) return rankings;
+    return filterRankingsByRule(rankings, effectiveRuleFilterId);
+  }, [rankings, effectiveRuleFilterId, ruleOptions.length]);
 
   const rankingItems = filteredRankings.map((r) => ({
     file_name: r.file_name,
@@ -269,27 +307,42 @@ export default function Index() {
         <p className="text-center text-xs text-muted-foreground mb-4 pb-2.5 border-b border-border">
           PREDICTIVE AUDIT ENGINE // 2026 VER. // MULTI-AGENT HACKATHON JUDGE
         </p>
+        {effectiveRound ? (
+          <p className="text-center text-[11px] font-mono text-accent mb-2">
+            round_id={effectiveRound}
+          </p>
+        ) : null}
 
         <div className="flex justify-center gap-3 mb-6">
           <Link
-            to="/submit"
+            to={`/submit${navSuffix}`}
             className="text-xs border border-primary/40 px-4 py-2 text-primary hover:bg-primary/10 hover:shadow-[0_0_12px_hsl(var(--primary)/0.3)] transition-all"
           >
             {t("nav.submitProject")}
           </Link>
           <Link
-            to={adminHash ? `/?h=${encodeURIComponent(adminHash)}` : "/"}
+            to={
+              adminHash
+                ? `/?h=${encodeURIComponent(adminHash)}${effectiveRound ? `&round_id=${encodeURIComponent(effectiveRound)}` : ""}`
+                : "/"
+            }
             className="text-xs border border-secondary/40 px-4 py-2 text-secondary hover:bg-secondary/10 hover:shadow-[0_0_12px_hsl(var(--secondary)/0.3)] transition-all"
           >
             {t("nav.adminPanel")}
+          </Link>
+          <Link
+            to={`/ranking${navSuffix}`}
+            className="text-xs border border-border px-4 py-2 text-muted-foreground hover:text-primary transition-all"
+          >
+            {t("nav.ranking")}
           </Link>
         </div>
 
         <ActiveRulePanel />
 
         <RankingRuleFilterBar
-          value={ruleFilterId}
-          onChange={setRuleFilterId}
+          value={effectiveRuleFilterId}
+          onChange={setRuleFilterOverride}
           options={ruleOptions}
           disabled={rankingsLoading}
         />
@@ -303,7 +356,11 @@ export default function Index() {
         />
 
         {selectedRankingFile && (
-          <JudgeDetail fileName={selectedRankingFile} onClose={() => setSelectedRankingFile(null)} />
+          <JudgeDetail
+            fileName={selectedRankingFile}
+            roundId={effectiveRound}
+            onClose={() => setSelectedRankingFile(null)}
+          />
         )}
 
         <FileSelector files={files} selected={selectedFile} onChange={setSelectedFile} loading={filesLoading} />

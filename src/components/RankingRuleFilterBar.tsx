@@ -1,5 +1,9 @@
 import { useI18n } from "@/lib/i18n";
-import { DEFAULT_RANKING_RULE_ID, LEGACY_RULE_FILTER_VALUE, type RuleFilterOption } from "@/lib/rankingRuleFilter";
+import {
+  ALL_RULES_FILTER_VALUE,
+  LEGACY_RULE_FILTER_VALUE,
+  type RuleFilterOption,
+} from "@/lib/rankingRuleFilter";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -11,8 +15,8 @@ interface Props {
 }
 
 function optionTriggerLabel(o: RuleFilterOption, t: (k: string) => string): string {
+  if (o.value === ALL_RULES_FILTER_VALUE) return t("ranking.ruleAllRulesOption");
   if (o.value === LEGACY_RULE_FILTER_VALUE) return t("ranking.ruleLegacyOption");
-  if (o.value === DEFAULT_RANKING_RULE_ID) return `${o.label || o.value} (${t("ranking.ruleDefaultBadge")})`;
   return o.label ? `${o.label} — ${o.value}` : o.value;
 }
 
@@ -37,7 +41,9 @@ export default function RankingRuleFilterBar({ value, onChange, options, disable
           ))}
         </SelectContent>
       </Select>
-      {selected && selected.value !== LEGACY_RULE_FILTER_VALUE && (
+      {selected &&
+        selected.value !== LEGACY_RULE_FILTER_VALUE &&
+        selected.value !== ALL_RULES_FILTER_VALUE && (
         <p className="text-[10px] text-muted-foreground font-mono break-all">
           {t("ranking.ruleSelectedMeta", {
             id: selected.value,
