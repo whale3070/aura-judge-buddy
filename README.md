@@ -2,180 +2,116 @@
 
 **Versioned, multi-model AI review + auditable rankings for hackathons and agent-era developer workflows.**
 
-Built for the [**Identity AI Hackathon**](https://identityhub.app/contests/ai-hackathon) (**$20,000** pool) — track: **Agent Infrastructure** (**$10,000**): tooling and primitives for the next generation of AI applications on TON (wallet-aware admin flows, reproducible scoring pipelines, developer-facing APIs, and coordination primitives for fair, large-scale evaluation).
+Built for the [**Identity AI Hackathon**](https://identityhub.app/contests/ai-hackathon) (**$20,000 total prize pool**) | Track: **Agent Infrastructure ($10,000)**
+
+Focus: Tooling and primitives for next-gen AI applications on TON — including wallet-aware admin flows, reproducible scoring pipelines, developer-facing APIs, and fair large-scale evaluation coordination primitives.
 
 ---
 
-## Public homepage — [http://198.55.109.102:3000/](http://198.55.109.102:3000/)
+## 📌 Overview
 
-The live `/` route shows the marketing narrative below (plus a language toggle and an optional long-form case-study article at the bottom). The **static shell** shipped with the production build is `dist/index.html` (hashed JS/CSS filenames change each `npm run build`).
+**Aura Judgement System** is a full-process, automated intelligent evaluation engine designed for hackathons, tech competitions and developer project audits. Powered by **Golang + layered multi-model AI**, it replaces inefficient manual preliminary review with quantitative, traceable and objective scoring, helping judges focus on high-value decisions while uncovering high-quality projects that are often overlooked.
 
-### `dist/index.html` (production entry)
-
-```html
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Aura Judgement System</title>
-    <meta name="description" content="Aura — hackathon project pre-review and multi-model audit with versioned YAML rules." />
-    <meta name="author" content="Aura" />
-
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/favicon-32.png" />
-
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="Aura Judgement System" />
-    <meta property="og:description" content="Hackathon pre-review, versioned rules, and auditable AI scoring." />
-
-    <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Aura Judgement System" />
-    <meta name="twitter:description" content="Hackathon pre-review, versioned rules, and auditable AI scoring." />
-    <script type="module" crossorigin src="/assets/index-zMqoGA3b.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-ShKo0-3Z.css">
-  </head>
-
-  <body>
-    <div id="root"></div>
-  </body>
-</html>
-```
-
-*(After rebuild, replace the `index-*.js` / `index-*.css` names with the files emitted under `dist/assets/`.)*
-
-### Landing copy (English — same text as the SPA)
-
-**⚖️ Aura Judgment System**  
-*Aura Judgement System — Hackathon Project Scoring · Full-Process AI Judging Engine*
-
-**What is it**  
-Aura Judgment System is a full-process automated review system for hackathons and tech competitions. Built with "Golang + Layered AI": automatic quantitative scoring, multi-model review, ranking & attestation. Fully automated from submission to scoring — efficient, cost-effective, and traceable.
-
-*In one sentence: AI reads all project docs and scores them, letting judges focus on decisions that truly need human judgment, never missing hidden gems.*
-
-**Goals**
-
-1. Boost review efficiency: Hundreds of projects per hackathon, auto-screened and scored, judges focus on top & disputed entries.
-2. More objective scoring: Multi-dimensional quantification + cross-model scoring, reducing bias and fatigue, more explainable results.
-3. Discover dark horses: Technically strong but poorly presented projects are identified through document & data analysis.
-4. Reduce costs: Layered AI (low-cost models for screening + premium models for deep review), total cost stays manageable.
-5. Fair & transparent: Open rules, traceable process, scores & reports are attestable.
-
-**What happens after submission**  
-After submitting your project online (form + optional docs + GitHub link), the system automatically completes:
-
-1. **Auto-clone repo:** If a GitHub link is provided, the system clones and parses `.md` documents.
-2. **AI auto-review:** Multi-dimensional scoring (innovation, feasibility, completeness, etc.) with multi-model (e.g. DeepSeek) parallel/layered review.
-3. **Generate review reports:** Each document gets detailed comments & a 0–100 score, with auto-calculated averages.
-4. **Join rankings:** Your project enters the leaderboard, sorted by score among all reviewed projects, publicly viewable.
-5. **Attestation & tracing:** Scores are saved as JSON attestations for later review, export, or roadshow/final review reference.
-
-*In short: Submit → Auto-parse & review → Get scores, reports & rankings, no manual initial review needed.*
-
-### 首页文案（中文 — 与线上切换语言一致）
-
-**⚖️ 阿乌拉裁决系统**  
-*Aura Judgement System — 黑客松项目量化评分 · 全流程智能裁决引擎*
-
-**系统是什么**  
-阿乌拉裁决系统是一套面向黑客松 / 科创大赛的全流程自动化评审系统。用「Golang + 分层 AI」实现：项目材料自动量化打分、多模型评审、排名与存证，从提交到出分全自动，效率提升、成本可控、结果可追溯。
-
-*一句话：用 AI 自动看完项目文档并打分，让评委把时间花在真正需要人工判断的地方，绝不漏掉优质黑马项目。*
-
-**目标是什么**
-
-1. 提升评审效率：一场黑客松几百个项目，系统自动初筛与打分，评委聚焦高分与争议项。
-2. 评分更客观：多维度量化 + 多模型交叉评分，减少人情分、疲劳分，结果更可解释。
-3. 发现黑马项目：技术强但表达弱的项目，通过文档与数据指标被系统识别出来。
-4. 降低成本：分层 AI（低成本模型初筛 + 高价值模型深度评审），总成本可控。
-5. 公平透明：规则公开、过程可追溯，评分与报告可存证。
-
-**提交项目后会给出什么**  
-当你通过本站在线提交项目（填写表单 + 可选上传文档 + GitHub 链接）后，系统会自动完成以下流程：
-
-1. 自动拉取仓库：若填写了 GitHub 链接，系统会 clone 仓库并解析其中的 .md 文档。
-2. AI 自动评审：对项目文档进行多维度打分（技术创新性、可行性、完成度等），支持多模型（如 DeepSeek 等）并行或分层评审。
-3. 生成评审报告：每个文档得到详细评语与 0–100 分，并自动计算平均分。
-4. 参与排名：你的项目会进入「项目排名」榜单，与其它已评审项目按分数排序，公开可查。
-5. 存证与追溯：评分结果以 JSON 存证保存，可后续复核、导出或用于路演/终审参考。
-
-*简而言之：提交 → 自动解析与评审 → 得到分数、报告与排名，全程无需人工介入初审。*
-
-### Long-form article on the same page
-
-Below the main card, the production homepage can render **「从昙花一现到长效落地：Aura 系统重构黑客松项目评估逻辑——基于实测项目数据的对比分析」** (human vs Aura five-dimension comparison on a real hackathon sample). Source: `src/components/PolkadotHackathonArticle.tsx`.
+**Core Slogan**: Let AI handle bulk document review and scoring, free judges from repetitive work, and never miss potential dark horse projects.
 
 ---
 
-## Why this matters (Agent Infrastructure angle)
+## 🌐 Public Homepage & Live Demo
 
-Agent ecosystems need **shared ground truth**: the same inputs, the same published rules, and comparable scores across many projects and models. Aura provides:
+- Official Homepage: [http://198.55.109.102:3000/](http://198.55.109.102:3000/) (supports Chinese/English toggle, built-in case study of manual vs AI review comparison)
 
-- A **YAML rules engine** (versioned, downloadable, activatable per round) so “what the AI was told to judge” is not a black box.
-- **Multi-model audits** with structured outputs and persisted **judge-result artifacts** (JSON) for replay and dispute handling.
-- **Public ranking surfaces** (tier bands, optional arena duels) so teams and sponsors see outcomes under a **single transparent pipeline** — infrastructure judges can inspect end-to-end.
+- Live Ranking (Round AI1): [http://198.55.109.102:3000/ranking?round_id=AI1](http://198.55.109.102:3000/ranking?round_id=AI1) (5D radar chart, S/A/B/C/D tier display, Markdown export)
 
-This is **infrastructure for evaluation and coordination**, not a one-off chat demo.
+- Admin Console (Round AI1): [http://198.55.109.102:3000/?h=vngLjNR0WeHzV57ubom8&round_id=AI1](http://198.55.109.102:3000/?h=vngLjNR0WeHzV57ubom8&amp;round_id=AI1) (requires admin wallet verification)
 
 ---
 
-## Live demo (AI1 round)
+## 🎯 Core Goals
 
-| Surface | URL | Notes |
-|--------|-----|--------|
-| **Public rankings** | [Ranking · `round_id=AI1`](http://198.55.109.102:3000/ranking?round_id=AI1) | Five-dimension radar, S/A/B/C/D/? tiers, optional duel notes, Markdown export. |
-| **Organizer console** | [Admin · `round_id=AI1`](http://198.55.109.102:3000/?h=vngLjNR0WeHzV57ubom8&round_id=AI1) | Requires admin wallet + access parameter `h` as deployed; rotate `h` for production. |
+1. **Boost Efficiency**: Automatically screen and score hundreds of hackathon projects, allowing judges to focus on top-tier and disputed entries only
 
----
+2. **Enhance Objectivity**: Multi-dimensional quantification + cross-model scoring, eliminating human bias, fatigue scoring and unfair factors, with fully explainable results
 
-## What we shipped (product map)
+3. **Discover Dark Horses**: Identify technically superior projects with weak presentation through document and code analysis, avoiding oversight by manual review
 
-### Frontend (`aura-judge-buddy`)
+4. **Control Costs**: Layered AI architecture (low-cost models for preliminary screening + high-performance models for in-depth review) to optimize overall evaluation costs
 
-- **Landing** — round-aware entry and contest context.
-- **Submit** — project submission flow aligned with backend `POST /api/submit`.
-- **Judge** — trigger audits, view per-file results, rule version context.
-- **Admin** — submissions, rounds, YAML rules upload/activate, judges panel, **S/A/B pool duels** (manual or auto bracket), GitHub metadata helpers.
-- **Ranking** — rule-version filter, tier grouping (collapsible), per-project **five-dimension radar** (0–20 per dimension, averaged across models), **arena duel rationale** when a bracket snapshot exists, UTF-8 **Markdown export** for reports.
-- **i18n** — Chinese / English toggles on key flows.
-
-### Backend (Aura Go API, served beside the SPA)
-
-Representative routes (see `aura/main.go`):
-
-- `POST /api/audit` — run AI audit against stored README/content and save structured results.
-- `GET /api/ranking`, `GET /api/judge-result`, `GET /api/results` — aggregate and per-file outcomes.
-- `GET/POST` rules — ` /api/rules/active`, `/api/rules/versions`, upload & activate (admin).
-- `POST /api/duel` (admin) — pairwise five-dimension duel between two submissions.
-- `GET/PUT/DELETE /api/duel-bracket-snapshot` — persist bracket snapshots under `submissions/<round_id>/.aura_duel_bracket_snapshot.json` so **public ranking can sync** without the organizer’s browser.
-- `POST /api/submit`, round & submission management, file content/GitHub URL helpers.
-
-**Admin authentication** uses configured admin wallet header (`X-Admin-Wallet`) where enforced — aligns with **wallet-native** operator workflows on TON-era stacks.
+5. **Ensure Fairness & Transparency**: Versioned open rules, full-process traceability, and auditable scoring reports
 
 ---
 
-## Architecture (high level)
+## 🔄 Full Project Evaluation Flow
+
+After project submission (online form + optional documents + GitHub repo link), the system runs fully automatically without manual preliminary intervention:
+
+1. **Auto Repository Parsing**: Clone GitHub repos and automatically parse README and other markdown documents
+
+2. **Multi-Model AI Review**: Conduct multi-dimensional scoring (innovation, technical implementation, commercial value, user experience, feasibility, etc.) via parallel or layered AI models (e.g., DeepSeek)
+
+3. **Generate Professional Reports**: Output detailed review comments and 0-100 quantitative scores, with automatic average calculation across models
+
+4. **Public Ranking Display**: Projects are ranked by comprehensive scores, with tiered classification and visual radar charts
+
+5. **Attestation & Traceability**: Scoring results are saved as structured JSON files, supporting later review, export and final judge reference
+
+---
+
+## 🧩 Core Features
+
+### Frontend (aura-judge-buddy | React + Vite + TypeScript)
+
+- **Landing Page**: Contest and round information display, bilingual language switch
+
+- **Project Submission**: Standardized submission flow aligned with backend API, supporting document upload and GitHub link binding
+
+- **Judge Panel**: Trigger AI audits, view single-file review results, check rule versions
+
+- **Admin Console**: Manage submissions and rounds, upload/activate YAML rules, S/A/B tier duel comparison, GitHub metadata analysis
+
+- **Ranking Page**: Multi-dimensional filtering, tier grouping, 5D radar chart visualization, arena duel rationale display, Markdown report export
+
+- **i18n Support**: Full Chinese-English bilingual adaptation for core pages and functions
+
+### Backend (Golang API)
+
+- RESTful API: Project audit, ranking query, result management, rule configuration
+
+- Versioned YAML Rule Engine: Rules are traceable and reproducible, no black-box evaluation
+
+- Multi-model Audit & Result Persistence: Structured JSON artifacts for replay and dispute handling
+
+- Duel & Bracket Management: Pairwise comparison and server-side snapshot synchronization
+
+- Wallet-Aware Admin Auth: X-Admin-Wallet header verification, adapted to TON ecosystem wallet-native workflows
+
+---
+
+## 🏗️ System Architecture
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│  React + Vite + TypeScript + shadcn/ui + Tailwind           │
-│  (ranking, admin, submit, judge, rules, duels)              │
+│  React + Vite + TypeScript + shadcn/ui + Tailwind CSS        │
+│  (Ranking, Admin, Submission, Judge, Rule & Duel Modules)   │
 └───────────────────────────┬─────────────────────────────────┘
-                            │  HTTP (VITE_API_BASE → Aura Go API
-                            │  or Supabase Edge proxy)
+                            │ HTTP API Requests
 ┌───────────────────────────▼─────────────────────────────────┐
-│  Aura Go service — YAML rules, audits, ranking, duels, files  │
-│  + on-disk artifacts (judge-result, submissions, snapshots)  │
+│                      Aura Go Backend                         │
+│  (YAML Rule Management, AI Audit, Ranking, Duel, Storage)   │
+│  + Persistent Artifacts: Judge Results, Submissions, Snapshots│
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Local development
+## 💻 Local Development
 
-**Prerequisites:** Node.js 18+, npm, and a running Aura API (or `VITE_API_BASE` pointing at your instance).
+### Prerequisites
+
+- Node.js 18+ & npm
+
+- Running Aura Go backend service
+
+### Startup Commands
 
 ```bash
 git clone <this-repo-url>
@@ -184,47 +120,86 @@ npm install
 npm run dev
 ```
 
-Configure API origin (critical for self-hosted backend):
+### Environment Configuration (.env.local)
 
 ```bash
-# .env.local example
 VITE_API_BASE=http://127.0.0.1:8888
-# Optional default round when URL omits round_id
-# VITE_ROUND_ID=your_round
+# Optional default round ID
+# VITE_ROUND_ID=your_round_id
 ```
+
+### Production Build
 
 ```bash
-npm run build   # production bundle → dist/
+npm run build
+# Production files output to dist/ directory
 ```
 
 ---
 
-## Repository layout
+## 📂 Repository Structure
 
-| Path | Role |
-|------|------|
-| `src/pages/` | Routed screens (Admin, Ranking, Submit, Judge, …). |
-| `src/components/` | UI panels (tiers, duels, radar charts, rule bars, …). |
-| `src/lib/` | API client, i18n, duel/bracket storage & remote sync, markdown export. |
-| `../` (Go backend, same monorepo as `aura-judge-buddy`) | `main.go`, rules persistence, duel snapshot files per `round_id`. |
+- `src/pages/`: Core page components (Admin, Ranking, Submit, Judge, etc.)
 
----
+- `src/components/`: Reusable UI modules (tier display, radar chart, duel panel, etc.)
 
-## Fit to “Agent Infrastructure” (judging rubric hooks)
+- `src/lib/`: API client, i18n, data storage, export tools
 
-- **Developer tools** — Versioned YAML rules, documented HTTP API, reproducible JSON judge artifacts.
-- **Coordination** — Multi-model aggregation, tiering, optional **arena bracket** with server-side snapshot for consistent public display.
-- **Wallet-aware ops** — Admin flows gated by wallet header / deployment policy, suitable for TON-native operator models.
-- **Transparency** — Same `round_id` links organizer console and public leaderboard; exportable Markdown for post-event reporting.
+- Go Backend: Located in the same monorepo, responsible for core logic and data persistence
 
 ---
 
-## 中文摘要（评委速览）
+## 🔗 Agent Infrastructure Alignment
 
-**Aura 裁决系统** 面向黑客松与大规模项目评审：后端 **Go** 提供可版本化的 **YAML 规则**、**多模型 AI 审计**、结构化 **存证 JSON**；前端 **React + Vite** 提供提交、管理台、**五维雷达与 S/A/B/C/D 分档排名**、可选 **擂台对决**（结果可同步服务端供公开排名页读取）。本项目参赛语境为 [**Identity AI Hackathon**](https://identityhub.app/contests/ai-hackathon) 的 **Agent Infrastructure** 赛道（TON 生态 AI 代理基础设施：可审计评审流水线、协调与公开榜单、钱包相关管理接口）。**演示**：[管理页](http://198.55.109.102:3000/?h=vngLjNR0WeHzV57ubom8&round_id=AI1)、[本轮排名](http://198.55.109.102:3000/ranking?round_id=AI1)。
+As a core project of the Agent Infrastructure track, Aura provides critical evaluation infrastructure for AI agent ecosystems:
+
+- **Consistent Evaluation Standards**: Versioned YAML rules ensure unified scoring logic across models and projects
+
+- **Developer-Friendly Tools**: Open API, reproducible artifacts, standardized data output
+
+- **Coordination Capabilities**: Multi-model result aggregation, public ranking, duel mechanism for project comparison
+
+- **TON Ecosystem Adaptation**: Wallet-aware admin permissions, fully adapted to TON chain developer workflows
 
 ---
 
-## License / attribution
+## 📄 Built-in Case Study
 
-Project scaffold and UI stack include **Vite**, **TypeScript**, **React**, **shadcn/ui**, and **Tailwind CSS**. Hackathon positioning and deployment URLs are specific to the Identity AI Hackathon submission described above.
+The official homepage includes a long-form analysis article: **从昙花一现到长效落地：Aura 系统重构黑客松项目评估逻辑——基于实测项目数据的对比分析**
+
+This article compares manual review and Aura AI review based on real hackathon data, proving that the system can effectively identify high-value projects with strong落地 feasibility and commercial potential, which are often ignored by manual judges focusing on presentation and creativity.
+
+---
+
+## 📝 License & Acknowledgments
+
+This project uses open-source frameworks including Vite, TypeScript, React, shadcn/ui and Tailwind CSS. Deployment and demo URLs are customized for the Identity AI Hackathon.
+
+---
+
+# 中文版本概要
+
+## 阿乌拉裁决系统
+
+**可版本化、多模型AI评审 + 可审计排名系统，专为黑客松与智能体时代开发者工作流设计**
+
+为[**Identity AI黑客松**](https://identityhub.app/contests/ai-hackathon)打造（总奖金2万美元）| 参赛赛道：**智能体基础设施（1万美元）**
+
+核心定位：为TON生态下一代AI应用提供工具与基础组件，包括钱包感知管理流程、可复现评分流水线、开发者API、公平大规模评审协调基础组件。
+
+### 核心价值
+
+阿乌拉裁决系统是面向黑客松、科创大赛的全流程自动化评审引擎，采用**Golang + 分层多模型AI**架构，实现项目材料自动量化打分、多模型交叉评审、排名与数据存证，解决传统人工评审效率低、主观性强、遗漏优质项目的痛点，让评委专注于核心决策。
+
+### 核心功能
+
+- 自动拉取解析GitHub仓库，全自动初审打分
+
+- 五维评分可视化，S/A/B/C/D分级排名，公开可查
+
+- 规则版本化可追溯，评审结果可存证、可导出
+
+- 支持中英双语，适配TON生态钱包权限管理
+
+- 内置人工与AI评审对比案例，直观体现系统优势
+> （注：文档部分内容可能由 AI 生成）
