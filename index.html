@@ -132,13 +132,18 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 
-    <article id="polkadot-result-article" lang="zh-CN">
+        <article id="polkadot-result-article" lang="zh-CN">
       <h1>从昙花一现到长效落地：Aura 系统重构黑客松项目评估逻辑——基于实测项目数据的对比分析</h1>
 
-      <p><strong>数据出处（可核验）</strong></p>
+      <p class="thesis">
+        <strong>核心观点</strong>：同一批项目下，<strong>人工综合三甲的排序 ≠ Aura 文档五维合计排序</strong>。人工评审天然侧重<strong>现场展示、叙事与主题贴合</strong>；Aura 侧重
+        <strong>README/存证里可解析的商业价值与落地可行性</strong>。两者不是谁取代谁，而是
+        <strong>Aura 用可追溯的量化补上人工在「文档侧长期交付潜力」上的盲区</strong>，让评审更全面。
+      </p>
+
+      <p><strong>数据出处</strong></p>
       <ul>
         <li>
-          公开排名页：
           <a
             href="http://198.55.109.102:3000/ranking?round_id=polkadot-mini-hackathon-2026-03"
             target="_blank"
@@ -146,45 +151,26 @@
           >Aura 项目排名 · polkadot-mini-hackathon-2026-03</a>
           （<code>round_id=polkadot-mini-hackathon-2026-03</code>）
         </li>
-        <li>
-          说明：下列五维分数与档位与导出当时的存证一致；若后台规则版本或评审结果更新，请以页面与 <code>judge-result</code> 目录中的存证为准。本文结论仅针对上述样本与时间截面，不向其他赛事或未观测项目外推。
-        </li>
+        <li>下表分数以当时存证为准；<strong>本文仅针对该轮次 13 个样本</strong>，不外推到其他赛事。</li>
       </ul>
 
       <hr />
 
       <p>
-        在区块链及开源技术黑客松赛事中，“参赛即巅峰、赛后即弃坑”是常见现象：许多项目在 Demo 与颁奖后投入下降，长期落地与商业化不足。本文基于本次
-        <strong>Aura AI 量化评估</strong>与<strong>人工评委评选</strong>的并行结果，对照项目分数、档位与奖项归属，讨论两套标准之间的差异，以及 Aura 能在何种意义上补充人工评审的信息维度。
+        黑客松里常见矛盾：评委时间有限，印象往往来自 <strong>Demo 与路演</strong>；而 <strong>能否交付、能否商业化</strong> 更多写在文档与代码里，现场未必展开。Aura 做的事，就是把后者
+        <strong>拉成同一套标尺、留痕可复盘</strong>。
       </p>
 
-      <h2>一、基础数据说明：评估对象与核心维度</h2>
-      <p>本次分析样本为 whale3070 账号下 <strong>13 个</strong>黑客松参赛项目，对应两套视角：</p>
-      <ol>
+      <h2>一、样本与口径</h2>
+      <ul>
         <li>
-          <strong>Aura AI 评估</strong>
-          <ul>
-            <li>
-              维度：<strong>创新性、技术实现、商业价值、用户体验、落地可行性</strong>（五维，单维 <strong>0–20</strong> 分，多模型结果取算术平均）。
-            </li>
-            <li>
-              <strong>档位</strong>：线上按五维解析结果划分为 <strong>S / A / B / C / D / ?</strong>（<code>?</code> 表示五维未完整解析）。下表仅列出样本中出现的
-              <strong>A / B / D</strong>，不代表 Aura 仅有这三档。
-            </li>
-            <li>
-              <strong>五维合计</strong>：下表「五维合计/100」为五维分数相加（每维满分 20）。排名页另有从评审正文解析的 <strong>0–100</strong> 均分（<code>avg_score</code>），与五维之和是不同指标，对照时勿混用。
-            </li>
-          </ul>
+          <strong>Aura</strong>：五维（创新性、技术实现、商业价值、用户体验、落地可行性）各 <strong>0–20</strong>，多模型取平均；档位
+          <strong>S/A/B/C/D/?</strong>（下表仅出现 A/B/D 样本）。<strong>五维合计</strong>为五维相加；排名页 <code>avg_score（0–100）</code> 为另一指标，勿与五维合计混用。
         </li>
-        <li>
-          <strong>人工评委评选</strong> — 综合权衡亮点、Demo、主题贴合度等，产生综合前三甲、最佳开发团队奖、最勤劳开发者等；<strong>无</strong>与 Aura 逐项对齐的固定量化标尺。
-        </li>
-        <li>
-          <strong>分析边界</strong> — 人工评审若更侧重现场展示与叙事，文档侧的商业与落地信号在结果中的权重可能相对较低；这一判断仅用于解释<strong>本批数据中的结构差异</strong>，不推广为对所有评委或赛事的定性。
-        </li>
-      </ol>
+        <li><strong>人工</strong>：综合三甲、最佳团队、最勤劳开发者等，<strong>无</strong>与 Aura 逐项对齐的固定标尺。</li>
+      </ul>
 
-      <h3>核心样本数据汇总（关键项目量化得分）</h3>
+      <h3>核心样本（五维合计 vs 人工结果）</h3>
       <div class="table-wrap">
         <table>
           <thead>
@@ -209,7 +195,7 @@
               <td>18.0</td>
               <td>17.0</td>
               <td>19.0</td>
-              <td>89.0</td>
+              <td><strong>89.0</strong></td>
               <td>最佳开发团队奖</td>
             </tr>
             <tr>
@@ -220,8 +206,8 @@
               <td>13.5</td>
               <td>16.0</td>
               <td>13.5</td>
-              <td>77.5</td>
-              <td>综合冠军</td>
+              <td><strong>77.5</strong></td>
+              <td><strong>综合冠军</strong></td>
             </tr>
             <tr>
               <td>Polk2.0-Revive-Hackathon-Lifepp（life++）</td>
@@ -231,7 +217,7 @@
               <td>16.0</td>
               <td>17.0</td>
               <td>18.0</td>
-              <td>86.0</td>
+              <td><strong>86.0</strong></td>
               <td>综合亚军</td>
             </tr>
             <tr>
@@ -242,91 +228,106 @@
               <td>16.0</td>
               <td>16.0</td>
               <td>14.5</td>
-              <td>77.0</td>
+              <td><strong>77.0</strong></td>
               <td>综合季军</td>
             </tr>
             <tr>
               <td>Willbook</td>
               <td>B</td>
-              <td colspan="5">（原稿未公示各维）</td>
-              <td>（原稿未公示）</td>
+              <td colspan="5">（未公示各维）</td>
+              <td>（未公示）</td>
               <td>最勤劳开发者（提名）、未进三甲</td>
             </tr>
             <tr>
               <td>1886_pixi-ace-air-combat</td>
               <td>D</td>
-              <td colspan="5">（原稿未公示各维）</td>
-              <td>（原稿未公示）</td>
-              <td>直接淘汰、无任何奖项</td>
+              <td colspan="5">（未公示各维）</td>
+              <td>（未公示）</td>
+              <td>淘汰、无奖项</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="note">
-        * 档位以 Aura <strong>五维分档规则</strong>为准，完整阶梯含 S/A/B/C/D/?，见排名页说明。<br />
-        ** 五维合计 = 五维分数相加（每维满分 20）。
-      </p>
+      <p class="note">* 完整分档见排名页说明。<br />** 五维合计满分 100。</p>
 
       <hr />
 
-      <h2>二、核心结论一：人工评选与量化排名存在明显错位</h2>
+      <h2>二、错在哪：人工三甲 vs Aura 五维合计</h2>
       <p>
-        <strong>结论</strong>：在本批样本中，<strong>人工综合名次与 Aura 五维合计排名不一致</strong>：综合三甲<strong>并非</strong>按五维合计分从高到低排列；五维合计领先的项目未进入综合前三，而评委对展示与叙事突出的项目给予了更高名次。与此同时，<strong>人工排序也不宜等同于「五维实力排名」</strong>——两套标准衡量的侧重点不同。
+        <strong>一句话</strong>：本批数据中，<strong>五维合计最高的 FireflyQR（89）没进综合前三</strong>；<strong>冠军 human-ai-battle（77.5）的商业与落地仅 13.5</strong>，低于 FireflyQR 的
+        <strong>18 / 19</strong>。人工把更高名次给了 <strong>现场与故事更抢眼</strong> 的项目，<strong>没有把「文档上的商业+落地强度」同步进综合排序</strong>——这就是
+        <strong>两套尺子</strong>。
       </p>
       <ol>
         <li>
-          <strong>量化合计领先者未进入人工综合前三</strong> — FireflyQR 五维合计 89.0，落地可行性 19.0、商业价值 18.0，为表中五维合计最高，但人工结果为「最佳开发团队奖」，未列入综合三甲。人工冠军 human-ai-battle 五维合计 77.5，商业与落地均为 13.5，与 FireflyQR 差距明显。由此可见，<strong>人工综合排序未按 Aura 五维合计分对齐</strong>。
+          <strong>量化第一 ≠ 综合前三</strong>：FireflyQR 商业 18、落地 19，全场五维合计最高，人工仅授「最佳开发团队」。冠军合计低 <strong>11.5 分</strong>，商业、落地差距尤其大。
         </li>
         <li>
-          <strong>人工前三与五维合计次序交叉</strong> — life++ 五维合计 86.0，高于冠军 77.5，仍居亚军；Subvote 合计 77.0，技术实现 13.5，为季军。说明在本批数据中，<strong>人工给出的名次顺序与五维合计高低并不一致</strong>，也不宜将人工名次直接解读为「纯噱头导向」——更准确的说法是：<strong>人工排序 ≠ 五维合计排序</strong>。
+          <strong>三甲内部也不按五维排</strong>：life++ 合计 <strong>86</strong> 高于冠军 <strong>77.5</strong>，仍是亚军；季军 Subvote 合计 77、技术实现 <strong>13.5</strong>。说明人工精排另有标准（赛道、现场、叙事权重等），<strong>与五维合计无固定对应</strong>。
         </li>
         <li>
-          <strong>粗筛结果与 Aura 档位存在对应</strong> — D 档的 1886_pixi-ace-air-combat 未获任何奖项；B 档 Willbook 未进综合三甲。说明在<strong>是否入围核心奖项</strong>这一层面，低档位与边缘化结果有一定重合；<strong>综合三甲的排序规则</strong>则与五维合计分脱钩，两套机制可以并行对照，而非相互替代。
+          <strong>粗筛仍可对齐</strong>：D 档无奖、B 档 Willbook 未进三甲——<strong>低档位与「不进核心奖」</strong>大体一致；矛盾集中在 <strong>三甲怎么排</strong>。
         </li>
       </ol>
-
-      <hr />
-
-      <h2>三、核心结论二：评选导向与赛后行为</h2>
       <p>
-        若赛事公开信号更强调短期 Demo 与现场叙事，团队在商业闭环与持续交付上的激励可能相对减弱；<strong>赛后是否继续投入</strong>还取决于奖金、维护成本、团队规划等因素，<strong>本分析不将其归结为单一原因</strong>。
+        <strong>对赛事主办与评委的含义</strong>：若希望「大奖名单」与「文档里体现的交付与商业潜力」更一致，就需要 <strong>显式引入文档量化或对照环节</strong>。Aura 提供的就是：<strong>同一规则、多模型、可导出、可审计</strong>
+        的五维分与档位，适合 <strong>初筛、榜外对照、复盘争议</strong>，而不是代替评委拍板。
       </p>
-      <ol>
-        <li>
-          <strong>human-ai-battle、Subvote</strong> 的商业价值与落地可行性在五维上相对偏低；若缺乏后续投入与变现路径，从量化结果看<strong>长期维护风险较高</strong>。这是基于分值的陈述，不构成对团队行为的预测。
-        </li>
-        <li>
-          <strong>FireflyQR</strong> 在五维上更均衡且商业、落地更高，但未进入综合三甲，仅获团队类奖项；就<strong>名次与量化结果的对应关系</strong>而言，存在<strong>排序与资源曝光不完全匹配</strong>的现象。
-        </li>
-        <li>
-          关于「赛后是否停更、是否构成行业常态」等问题，<strong>本文不作结论</strong>：缺乏对 13 个项目赛后仓库与版本的持续追踪数据，任何外推都超出本文证据范围。
-        </li>
-      </ol>
 
       <hr />
 
-      <h2>四、核心结论三：Aura 能力与产品边界</h2>
-      <ol>
+      <h2>三、Aura 补什么位（价值锚点）</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>人工侧常见痛点</th>
+              <th>Aura 补什么</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>印象分、疲劳、口径难统一</td>
+              <td><strong>多模型 + YAML 规则</strong>，同一套维度反复跑，结果落在 <code>judge-result</code> <strong>可复查</strong></td>
+            </tr>
+            <tr>
+              <td>现场强、文档弱的项目易被高估</td>
+              <td>从 README/材料里 <strong>显式打出商业价值、落地可行性</strong>，与「会不会讲」脱钩一层</td>
+            </tr>
+            <tr>
+              <td>项目多、评委看不完</td>
+              <td><strong>大批量自动分档与排名</strong>，把人力留给边界案例与综合判断</td>
+            </tr>
+            <tr>
+              <td>赛后扯皮「当时怎么评的」</td>
+              <td><strong>存证 JSON</strong>，规则版本可查</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <strong>边界一句话</strong>：<strong>颁奖规则、资源给谁、最终谁赢</strong> 仍是 <strong>赛制 + 人</strong>；Aura 是 <strong>数据层工具</strong>，和现场评审 <strong>并列使用</strong> 最顺。
+      </p>
+
+      <hr />
+
+      <h2>四、线上能力速览</h2>
+      <ul>
+        <li>五维解析、<strong>S/A/B/C/D/?</strong> 分档、排名页 <strong>规则版本筛选</strong>（与管理员控制台口径可对齐）。</li>
         <li>
-          <strong>当前已实现能力</strong> — 从 README 与存证解析五维、多模型平均、<strong>S/A/B/C/D/? 分档</strong>；排名页支持<strong>规则版本筛选</strong>，可与管理员控制台口径对齐。<strong>擂台两两对决</strong>结果可保存在浏览器并同步至服务端（<code>submissions/&lt;round_id&gt;/.aura_duel_bracket_snapshot.json</code>），用于同档内展示顺序与对决说明；<strong>精排仍以赛事规则与人工为准</strong>，Aura 提供可复核的文档侧量化与可选擂台记录。
+          可选 <strong>擂台两两对决</strong>，结果可同步服务端：<code>submissions/&lt;round_id&gt;/.aura_duel_bracket_snapshot.json</code>。
         </li>
-        <li>
-          <strong>权重方案（路线图，非默认配置）</strong> — 业界讨论中可能出现的「技术落地 40%、商业价值 35%」等加权设想，属于<strong>产品与赛制设计选项</strong>，<strong>不是</strong>当前 Aura 线上默认逻辑；现行以<strong>五维达标阶梯</strong>划档为主。
-        </li>
-        <li>
-          <strong>资源与闭环</strong> — 投资对接、流量与生态扶持属于<strong>运营与生态层</strong>工作；Aura 输出的是<strong>可审计的量化与分档</strong>，可作为资源分配与复盘时的<strong>输入之一</strong>，本身不替代商务或运营决策。
-        </li>
-        <li>
-          <strong>人机分工</strong> — 较贴近现状的用法是：<strong>Aura 承担文档与规则口径下的大范围筛选与对照</strong>，<strong>人工在既定赛道与叙事维度上作最终权衡</strong>，二者并列使用而非互相取消。
-        </li>
-      </ol>
+        <li>讨论中的「自定义维度权重」属 <strong>路线图</strong>，<strong>当前线上</strong>以 <strong>五维达标阶梯</strong> 划档。</li>
+      </ul>
 
       <hr />
 
       <h2>五、总结</h2>
       <p>
-        在本批 Polkadot 迷你黑客松样本中，人工综合名次与 Aura 五维合计排名<strong>明显错位</strong>，但二者侧重不同，宜对照阅读而非简单对立。Aura 以<strong>文档与存证驱动的五维量化与分档</strong>提供可复核依据；其合理定位是<strong>数据与流程层工具</strong>，与人工评审、赛事规则及后续运营配合。超出本文样本、时间与数据范围之外的推断，均应保持克制。
+        本批 Polkadot 迷你黑客松里，<strong>人工综合三甲与 Aura 五维合计明显错位</strong>——根子是 <strong>评审场景不同：现场叙事 vs 文档量化</strong>。<strong>Aura 的价值</strong>不是否定评委，而是
+        <strong>用可追溯的 AI 量化把「落地与商业」钉在纸上</strong>，与人工互补，<strong>减少只看现场、不看交付潜力的评审盲区</strong>。以上结论 <strong>仅对本表 13 个项目与上述轮次有效</strong>。
       </p>
     </article>
+
   </body>
 </html>
