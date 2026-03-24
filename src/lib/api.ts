@@ -47,6 +47,10 @@ export interface SubmissionItem {
   github_username?: string;
   github_account_created_at?: string;
   github_account_years?: number;
+  /** 后端 GitHub enrich 失败原因（限流/权限/网络等），用于前端兜底提示 */
+  github_enrich_error?: string;
+  /** 后端稳定状态码：success|rate_limited|unauthorized|not_found|network|invalid_url|parse_error|unknown */
+  github_enrich_status?: string;
 }
 
 export type BuilderFilter = "all" | "beginner" | "longterm";

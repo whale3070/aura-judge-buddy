@@ -403,6 +403,15 @@ function SubmissionsTab({
     if (typeof years === "number" && !Number.isNaN(years)) {
       return t("admin.accountYearsValue", { n: String(years) });
     }
+    const status = (s.github_enrich_status ?? "").toLowerCase();
+    if (status) {
+      if (status === "rate_limited") return t("admin.accountYearsRateLimited");
+      if (status === "unauthorized") return t("admin.accountYearsUnauthorized");
+      if (status === "not_found") return t("admin.accountYearsNotFound");
+      if (status === "network") return t("admin.accountYearsNetwork");
+      if (status === "invalid_url") return t("admin.accountYearsInvalidUrl");
+      if (status !== "success") return t("admin.accountYearsLookupFailed");
+    }
     if (s.github_username) return t("admin.accountYearsFetching");
     if (hasRepoURL(s)) return t("admin.accountYearsRepoNoAge");
     return t("admin.accountYearsNoGitHub");
@@ -493,6 +502,12 @@ function SubmissionsTab({
                 <div>
                   <span className="text-muted-foreground text-xs">{t("admin.legacyFormNote")}</span>
                   <p className="text-foreground/80 text-xs mt-1">{s.why_this_chain}</p>
+                </div>
+              )}
+              {!!s.github_enrich_error && (
+                <div>
+                  <span className="text-muted-foreground text-xs">GitHub API</span>
+                  <p className="text-destructive text-xs mt-1 break-words">{s.github_enrich_error}</p>
                 </div>
               )}
               {s.md_files && s.md_files.length > 0 && (

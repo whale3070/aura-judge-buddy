@@ -102,6 +102,7 @@ const translations = {
   "ranking.ruleLegacyOption": { zh: "旧数据（存证无 rule_version_id）", en: "Legacy (no rule_version_id in attestation)" },
   "ranking.ruleSelectedMeta": { zh: "ID: {id} · SHA256: {sha}", en: "ID: {id} · SHA256: {sha}" },
   "ranking.tierSection": { zh: "{tier} 档", en: "Tier {tier}" },
+  "ranking.tierExpandHint": { zh: "{n} 个项目 · 点击展开", en: "{n} projects · tap to expand" },
   "ranking.tierUnknown": { zh: "未分档（五维未完整解析）", en: "Unclassified (incomplete five-dimension parse)" },
   "ranking.bracketOrderHint": {
     zh: "已应用最近一次擂台淘汰赛顺序：{tier} 档池（数据保存在本浏览器，仅作展示参考）。",
@@ -292,6 +293,12 @@ const translations = {
   "admin.accountYears": { zh: "账号年限", en: "Account years" },
   "admin.accountYearsValue": { zh: "{n} 年", en: "{n} yr" },
   "admin.accountYearsFetching": { zh: "获取中", en: "Fetching..." },
+  "admin.accountYearsLookupFailed": { zh: "查询失败", en: "Lookup failed" },
+  "admin.accountYearsRateLimited": { zh: "查询限流", en: "Rate limited" },
+  "admin.accountYearsUnauthorized": { zh: "鉴权失败", en: "Unauthorized" },
+  "admin.accountYearsNotFound": { zh: "仓库/账号不存在", en: "Repo/user not found" },
+  "admin.accountYearsNetwork": { zh: "网络异常", en: "Network error" },
+  "admin.accountYearsInvalidUrl": { zh: "仓库链接无效", en: "Invalid GitHub URL" },
   "admin.accountYearsNoGitHub": { zh: "未填仓库链接", en: "No repo URL" },
   "admin.accountYearsRepoNoAge": {
     zh: "已填仓库（年限未同步）",
