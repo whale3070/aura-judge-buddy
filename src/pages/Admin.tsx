@@ -6,13 +6,11 @@ import {
   fetchAdminConfig,
   fetchFileTitles,
   deleteSubmission,
-  refreshSubmissionFromGithub,
   type RankingItem,
   type SubmissionItem,
   type BuilderFilter,
 } from "@/lib/api";
-import { effectiveRoundIdFromSearchParam, roundNavSuffix, submitAuditAPI } from "@/lib/apiClient";
-import { MODELS } from "@/lib/prompts";
+import { roundNavSuffix } from "@/lib/apiClient";
 import { toast } from "sonner";
 import JudgeDetail from "@/components/JudgeDetail";
 import GradeRankingPanel from "@/components/GradeRankingPanel";
@@ -330,7 +328,6 @@ function SubmissionsTab({
   const { t } = useI18n();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [reauditing, setReauditing] = useState<string | null>(null);
 
   const rankByFile = useMemo(() => buildRankingByFileName(rankings), [rankings]);
 
@@ -353,44 +350,6 @@ function SubmissionsTab({
       alert(e.message || "Delete failed");
     } finally {
       setDeleting(null);
-    }
-  };
-
-  const handleReaudit = async (s: SubmissionItem) => {
-    const rid = effectiveRoundIdFromSearchParam(queryRoundId);
-    if (!rid) {
-      toast.error(t("admin.reauditNeedRound"));
-      return;
-    }
-    if (!hasRepoURL(s)) {
-      toast.error(t("admin.reauditNoGithub"));
-      return;
-    }
-    if (!confirm(t("admin.reauditConfirmGithub"))) return;
-    setReauditing(s.id);
-    try {
-      const refreshed = await refreshSubmissionFromGithub(s.id, adminWallet, queryRoundId);
-      if (refreshed.readme_only) {
-        toast.success(refreshed.message ?? t("admin.reauditReadmeOnlyDone"));
-        onRankingsRefresh?.();
-        return;
-      }
-      const selectedModels = MODELS.filter((m) => m.defaultChecked).map((m) => m.id);
-      const data = await submitAuditAPI({
-        target_file: refreshed.target_file,
-        custom_prompt:
-          "Score strictly based on the active rules. Re-evaluate this submission from scratch with the same rigor as a first review.",
-        selected_models: selectedModels.length > 0 ? selectedModels : ["deepseek", "doubao"],
-        output_lang: "en",
-        round_id: rid,
-      });
-      toast.success(t("admin.reauditSuccess", { score: String(data.avg_score) }));
-      onRankingsRefresh?.();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : t("admin.reauditFail");
-      toast.error(msg);
-    } finally {
-      setReauditing(null);
     }
   };
 
@@ -456,17 +415,8 @@ function SubmissionsTab({
               <div className="flex items-center gap-1.5 shrink-0 mx-2">
                 <button
                   type="button"
-                  onClick={() => handleReaudit(s)}
-                  disabled={reauditing === s.id || deleting === s.id || !hasRepoURL(s)}
-                  title={!hasRepoURL(s) ? t("admin.reauditNoGithub") : undefined}
-                  className="text-xs border border-primary/40 px-2.5 py-1 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
-                >
-                  {reauditing === s.id ? t("admin.reauditing") : t("admin.reaudit")}
-                </button>
-                <button
-                  type="button"
                   onClick={() => handleDelete(s.id, submissionDisplayTitle(s))}
-                  disabled={deleting === s.id || reauditing === s.id}
+                  disabled={deleting === s.id}
                   className="text-xs border border-destructive/40 px-2.5 py-1 text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
                 >
                   {deleting === s.id ? t("admin.deleting") : t("admin.delete")}

@@ -14,8 +14,6 @@ import {
   roundNavSuffix,
 } from "@/lib/apiClient";
 import JudgeDetail from "@/components/JudgeDetail";
-import RankingTable from "@/components/RankingTable";
-import RankingRuleFilterBar from "@/components/RankingRuleFilterBar";
 import ActiveRulePanel from "@/components/ActiveRulePanel";
 import FileSelector from "@/components/FileSelector";
 import ModelSelector from "@/components/ModelSelector";
@@ -74,7 +72,6 @@ export default function Index() {
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
   const [rankingsLoading, setRankingsLoading] = useState(true);
   const [reports, setReports] = useState<ReportEntry[]>([]);
-  const [selectedRankingFile, setSelectedRankingFile] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
   const batchStopRef = useRef(false);
@@ -277,19 +274,6 @@ export default function Index() {
     return filterRankingsByRule(rankings, effectiveRuleFilterId);
   }, [rankings, effectiveRuleFilterId, ruleOptions.length]);
 
-  const rankingItems = filteredRankings.map((r) => ({
-    file_name: r.file_name,
-    avg_score: r.avg_score,
-    timestamp: r.timestamp,
-    rule_version_id: r.rule_version_id,
-    rule_sha256: r.rule_sha256,
-    search_query: r.search_query,
-    competitor_results_count: r.competitor_results_count,
-  }));
-
-  const rankingEmptyHint =
-    !rankingsLoading && rankings.length > 0 && rankingItems.length === 0 ? t("ranking.emptyRuleFiltered") : undefined;
-
   return (
     <div className="min-h-screen bg-background p-5 relative overflow-hidden">
       {/* Scanline */}
@@ -340,28 +324,7 @@ export default function Index() {
 
         <ActiveRulePanel />
 
-        <RankingRuleFilterBar
-          value={effectiveRuleFilterId}
-          onChange={setRuleFilterOverride}
-          options={ruleOptions}
-          disabled={rankingsLoading}
-        />
-        <RankingTable
-          rankings={rankingItems}
-          loading={rankingsLoading}
-          selectedFile={selectedRankingFile ?? undefined}
-          onSelect={(f) => setSelectedRankingFile(f === selectedRankingFile ? null : f)}
-          titleMap={titleMap}
-          emptyHint={rankingEmptyHint}
-        />
-
-        {selectedRankingFile && (
-          <JudgeDetail
-            fileName={selectedRankingFile}
-            roundId={effectiveRound}
-            onClose={() => setSelectedRankingFile(null)}
-          />
-        )}
+        {/* judge 页面移除“终焉大盘”排行榜区，保留下方裁决操作区 */}
 
         <FileSelector files={files} selected={selectedFile} onChange={setSelectedFile} loading={filesLoading} />
         {/* Custom prompt (optional) */}
