@@ -83,9 +83,20 @@ interface Props {
   adminWallet?: string | null;
   /** 与 URL ?round_id= 一致，拉取 judge-result / file-content 时用 */
   roundId?: string | null;
+  /** 是否展示“擂台 · AI 两两评比（同档位内）” */
+  showDuelPanel?: boolean;
+  onReauditDone?: () => void;
 }
 
-export default function GradeRankingPanel({ rankings, loading, titleMap, adminWallet, roundId }: Props) {
+export default function GradeRankingPanel({
+  rankings,
+  loading,
+  titleMap,
+  adminWallet,
+  roundId,
+  showDuelPanel = true,
+  onReauditDone,
+}: Props) {
   const [expandedTier, setExpandedTier] = useState<LetterTier | null>("S");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
 
@@ -169,12 +180,14 @@ export default function GradeRankingPanel({ rankings, loading, titleMap, adminWa
         </div>
       </div>
 
-      <STierDuelPanel
-        candidates={duelCandidates}
-        adminWallet={adminWallet ?? ""}
-        enabled={duelEnabled}
-        roundId={roundId}
-      />
+      {showDuelPanel && (
+        <STierDuelPanel
+          candidates={duelCandidates}
+          adminWallet={adminWallet ?? ""}
+          enabled={duelEnabled}
+          roundId={roundId}
+        />
+      )}
 
       {TIER_ORDER.map((tier) => {
         const projects = tierGroups[tier];
@@ -246,6 +259,7 @@ export default function GradeRankingPanel({ rankings, loading, titleMap, adminWa
                                 fileName={p.item.file_name}
                                 roundId={roundId}
                                 onClose={() => setSelectedFile(null)}
+                                onReauditDone={onReauditDone}
                               />
                             </div>
                           )}

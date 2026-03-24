@@ -20,6 +20,8 @@ import ModelSelector from "@/components/ModelSelector";
 import BatchControls from "@/components/BatchControls";
 import ReportCard from "@/components/ReportCard";
 import AuditIndeterminateProgress from "@/components/AuditIndeterminateProgress";
+import GradeRankingPanel from "@/components/GradeRankingPanel";
+import DuelLegacySnapshotBanner from "@/components/DuelLegacySnapshotBanner";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -33,6 +35,7 @@ import {
 } from "@/lib/rankingRuleFilter";
 
 const COMMON_KEYWORDS = ["GoPlus","token security API","rug pull detection","address scan","contract risk scoring","honeypot detection","token risk API","address risk API"];
+const BATCH_SINGLE_TIMEOUT_MS = 120000;
 
 interface ReportEntry {
   id: string;
@@ -57,6 +60,23 @@ function extractAvgScore(reports: AuditReport[]): number | null {
   return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
 }
 
+async function withTimeout<T>(p: Promise<T>, timeoutMs: number, onTimeout?: () => void): Promise<T> {
+  let timer: number | undefined;
+  try {
+    return await Promise.race<T>([
+      p,
+      new Promise<T>((_, reject) => {
+        timer = window.setTimeout(() => {
+          onTimeout?.();
+          reject(new Error(`timeout after ${Math.floor(timeoutMs / 1000)}s`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) window.clearTimeout(timer);
+  }
+}
+
 export default function Index() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
@@ -74,10 +94,15 @@ export default function Index() {
   const [reports, setReports] = useState<ReportEntry[]>([]);
   const [running, setRunning] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
+  const [rejudgeAllRunning, setRejudgeAllRunning] = useState(false);
   const batchStopRef = useRef(false);
+  const inflightAbortControllersRef = useRef<Set<AbortController>>(new Set());
   const [concurrency, setConcurrency] = useState(1);
   const [delayMs, setDelayMs] = useState(200);
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [progress, setProgress] = useState({ done: 0, total: 0, started: 0 });
+  const [batchStartedAtMs, setBatchStartedAtMs] = useState<number | null>(null);
+  const [lastProgressAtMs, setLastProgressAtMs] = useState<number | null>(null);
+  const [lastBatchDurationMs, setLastBatchDurationMs] = useState<number | null>(null);
   const [adminHash, setAdminHash] = useState<string | null>(null);
   const [enableWebSearch, setEnableWebSearch] = useState(true);
   const [projectKeywords, setProjectKeywords] = useState<string[]>([]);
@@ -85,6 +110,7 @@ export default function Index() {
   const [outputLang, setOutputLang] = useState<"en" | "zh">("en");
   const [ruleFilterOverride, setRuleFilterOverride] = useState<string | undefined>(undefined);
   const [versionMetas, setVersionMetas] = useState<RuleVersionMeta[]>([]);
+  const [adminWalletForDuel, setAdminWalletForDuel] = useState<string>("");
 
   useEffect(() => {
     setRuleFilterOverride(undefined);
@@ -112,6 +138,15 @@ export default function Index() {
     fetchAdminConfigAPI()
       .then((cfg) => setAdminHash(cfg.admin_hash ?? ""))
       .catch(() => setAdminHash(""));
+  }, []);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("aura_admin_wallet") || "";
+      setAdminWalletForDuel(saved);
+    } catch {
+      setAdminWalletForDuel("");
+    }
   }, []);
 
   const addReport = (entry: ReportEntry) => {
@@ -173,6 +208,10 @@ export default function Index() {
     }
     batchStopRef.current = false;
     setBatchRunning(true);
+    const startedAt = Date.now();
+    setBatchStartedAtMs(startedAt);
+    setLastProgressAtMs(startedAt);
+    setLastBatchDurationMs(null);
     let allFiles: string[] = [];
     try {
       allFiles = await fetchFilesAPI(roundQ);
@@ -189,7 +228,8 @@ export default function Index() {
     const pending = allFiles.filter((f) => !analyzed.has(f));
     const total = pending.length;
     let done = 0;
-    setProgress({ done: 0, total });
+    let started = 0;
+    setProgress({ done: 0, total, started: 0 });
     if (total === 0) {
       addReport({ id: crypto.randomUUID(), fileName: "[BATCH]", avgScore: null, statusText: "NO_PENDING_FILES", reports: [], open: false });
       setBatchRunning(false);
@@ -201,18 +241,28 @@ export default function Index() {
         const myIdx = index++;
         if (myIdx >= pending.length) return;
         const file = pending[myIdx];
+        started++;
+        setProgress({ done, total, started });
+        addReport({ id: crypto.randomUUID(), fileName: file, avgScore: null, statusText: `WORKER#${workerId} START`, reports: [], open: false });
         const placeholderId = crypto.randomUUID();
         addReport({ id: placeholderId, fileName: file, avgScore: null, statusText: `WORKER#${workerId} RUNNING`, reports: [], open: false });
+        const ac = new AbortController();
+        inflightAbortControllersRef.current.add(ac);
         try {
-          const data = await submitAuditAPI({
-            target_file: file,
-            custom_prompt: prompt,
-            selected_models: selectedModels,
-            output_lang: outputLang,
-            enable_web_search: enableWebSearch || undefined,
-            project_keywords: enableWebSearch ? projectKeywords : undefined,
-            round_id: effectiveRound,
-          });
+          const data = await withTimeout(
+            submitAuditAPI({
+              target_file: file,
+              custom_prompt: prompt,
+              selected_models: selectedModels,
+              output_lang: outputLang,
+              enable_web_search: enableWebSearch || undefined,
+              project_keywords: enableWebSearch ? projectKeywords : undefined,
+              round_id: effectiveRound,
+            }, ac.signal),
+            BATCH_SINGLE_TIMEOUT_MS,
+            () => ac.abort()
+          );
+          inflightAbortControllersRef.current.delete(ac);
           const avg = extractAvgScore(data.reports);
           removeReport(placeholderId);
           addReport({
@@ -228,9 +278,12 @@ export default function Index() {
         } catch (err: any) {
           removeReport(placeholderId);
           addReport({ id: crypto.randomUUID(), fileName: file, avgScore: null, statusText: `WORKER#${workerId} FAIL`, reports: [], error: err.message, open: false });
+        } finally {
+          inflightAbortControllersRef.current.delete(ac);
         }
         done++;
-        setProgress({ done, total });
+        setProgress({ done, total, started });
+        setLastProgressAtMs(Date.now());
         if (done % 3 === 0 || done === total) {
           try {
             const r = await fetchRankingsAPI(roundQ);
@@ -244,6 +297,7 @@ export default function Index() {
     };
     await Promise.all(Array.from({ length: concurrency }, (_, i) => worker(i + 1)));
     setBatchRunning(false);
+    setLastBatchDurationMs(Date.now() - startedAt);
     addReport({
       id: crypto.randomUUID(),
       fileName: `[BATCH]`,
@@ -260,7 +314,132 @@ export default function Index() {
     }
   };
 
+  const runBatchRejudgeAll = async () => {
+    if (selectedModels.length === 0) {
+      toast.error(t("judge.selectFileAndModels"));
+      return;
+    }
+    batchStopRef.current = false;
+    setRejudgeAllRunning(true);
+    const startedAt = Date.now();
+    setBatchStartedAtMs(startedAt);
+    setLastProgressAtMs(startedAt);
+    setLastBatchDurationMs(null);
+    let allFiles: string[] = [];
+    try {
+      allFiles = await fetchFilesAPI(roundQ);
+    } catch {
+      setRejudgeAllRunning(false);
+      return;
+    }
+    const total = allFiles.length;
+    let done = 0;
+    let started = 0;
+    setProgress({ done: 0, total, started: 0 });
+    if (total === 0) {
+      addReport({ id: crypto.randomUUID(), fileName: "[REJUDGE_ALL]", avgScore: null, statusText: "NO_FILES", reports: [], open: false });
+      setRejudgeAllRunning(false);
+      return;
+    }
+    let index = 0;
+    const worker = async (workerId: number) => {
+      while (!batchStopRef.current) {
+        const myIdx = index++;
+        if (myIdx >= allFiles.length) return;
+        const file = allFiles[myIdx];
+        started++;
+        setProgress({ done, total, started });
+        addReport({ id: crypto.randomUUID(), fileName: file, avgScore: null, statusText: `REJUDGE#${workerId} START`, reports: [], open: false });
+        const placeholderId = crypto.randomUUID();
+        addReport({ id: placeholderId, fileName: file, avgScore: null, statusText: `REJUDGE#${workerId} RUNNING`, reports: [], open: false });
+        const ac = new AbortController();
+        inflightAbortControllersRef.current.add(ac);
+        try {
+          const data = await withTimeout(
+            submitAuditAPI({
+              target_file: file,
+              custom_prompt: prompt,
+              selected_models: selectedModels,
+              output_lang: outputLang,
+              enable_web_search: enableWebSearch || undefined,
+              project_keywords: enableWebSearch ? projectKeywords : undefined,
+              round_id: effectiveRound,
+            }, ac.signal),
+            BATCH_SINGLE_TIMEOUT_MS,
+            () => ac.abort()
+          );
+          inflightAbortControllersRef.current.delete(ac);
+          const avg = extractAvgScore(data.reports);
+          removeReport(placeholderId);
+          addReport({
+            id: crypto.randomUUID(),
+            fileName: file,
+            avgScore: avg,
+            statusText: `REJUDGE#${workerId} OK`,
+            reports: data.reports,
+            open: false,
+            ruleVersionId: data.rule_version_id,
+            ruleSha256: data.rule_sha256,
+          });
+        } catch (err: any) {
+          removeReport(placeholderId);
+          addReport({ id: crypto.randomUUID(), fileName: file, avgScore: null, statusText: `REJUDGE#${workerId} FAIL`, reports: [], error: err.message, open: false });
+        } finally {
+          inflightAbortControllersRef.current.delete(ac);
+        }
+        done++;
+        setProgress({ done, total, started });
+        setLastProgressAtMs(Date.now());
+        if (done % 3 === 0 || done === total) {
+          try {
+            const r = await fetchRankingsAPI(roundQ);
+            setRankings(r);
+          } catch {
+            /* */
+          }
+        }
+        if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+      }
+    };
+    await Promise.all(Array.from({ length: concurrency }, (_, i) => worker(i + 1)));
+    setRejudgeAllRunning(false);
+    setLastBatchDurationMs(Date.now() - startedAt);
+    addReport({
+      id: crypto.randomUUID(),
+      fileName: `[REJUDGE_ALL]`,
+      avgScore: null,
+      statusText: batchStopRef.current ? "STOPPED" : "FINISHED",
+      reports: [],
+      open: false,
+    });
+    try {
+      const r = await fetchRankingsAPI(roundQ);
+      setRankings(r);
+    } catch {
+      /* */
+    }
+  };
+
   const ruleOptions = useMemo(() => buildRuleFilterOptions(rankings, versionMetas), [rankings, versionMetas]);
+
+  const stopBatchNow = () => {
+    batchStopRef.current = true;
+    inflightAbortControllersRef.current.forEach((ac) => ac.abort());
+    inflightAbortControllersRef.current.clear();
+    if (batchRunning || rejudgeAllRunning) {
+      setBatchRunning(false);
+      setRejudgeAllRunning(false);
+      if (batchStartedAtMs != null) setLastBatchDurationMs(Date.now() - batchStartedAtMs);
+      addReport({
+        id: crypto.randomUUID(),
+        fileName: `[BATCH]`,
+        avgScore: null,
+        statusText: "STOPPED",
+        reports: [],
+        open: false,
+      });
+    }
+  };
 
   const effectiveRuleFilterId = useMemo(() => {
     if (ruleOptions.length === 0) return LEGACY_RULE_FILTER_VALUE;
@@ -323,6 +502,20 @@ export default function Index() {
         </div>
 
         <ActiveRulePanel />
+        <DuelLegacySnapshotBanner expectedRoundId={effectiveRound ?? ""} />
+        <div className="mb-6">
+          <GradeRankingPanel
+            rankings={filteredRankings}
+            loading={rankingsLoading}
+            titleMap={titleMap}
+            adminWallet={adminWalletForDuel || null}
+            roundId={effectiveRound}
+            showDuelPanel={true}
+            onReauditDone={() => {
+              void fetchRankingsAPI(roundQ).then(setRankings).catch(() => {});
+            }}
+          />
+        </div>
 
         {/* judge 页面移除“终焉大盘”排行榜区，保留下方裁决操作区 */}
 
@@ -405,7 +598,7 @@ export default function Index() {
         <div className="flex gap-3 mb-2">
           <button
             onClick={runSingleAudit}
-            disabled={running || batchRunning}
+            disabled={running || batchRunning || rejudgeAllRunning}
             className="flex-1 bg-primary text-primary-foreground font-bold py-4 text-sm tracking-wider hover:shadow-[0_0_20px_hsl(var(--primary)/0.6)] hover:-translate-y-px transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {running ? t("judge.singleRunning") : t("judge.singleBtn")}
@@ -422,14 +615,21 @@ export default function Index() {
         <div className="flex gap-3 mb-2">
           <button
             onClick={runBatchAudit}
-            disabled={running || batchRunning}
+            disabled={running || batchRunning || rejudgeAllRunning}
             className="flex-1 bg-primary text-primary-foreground font-bold py-4 text-sm tracking-wider hover:shadow-[0_0_20px_hsl(var(--primary)/0.6)] hover:-translate-y-px transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {batchRunning ? t("judge.batchRunning") : t("judge.batchBtn")}
           </button>
           <button
-            onClick={() => { batchStopRef.current = true; }}
-            disabled={!batchRunning}
+            onClick={runBatchRejudgeAll}
+            disabled={running || batchRunning || rejudgeAllRunning}
+            className="w-72 bg-secondary text-secondary-foreground font-bold py-4 text-sm tracking-wider hover:shadow-[0_0_18px_hsl(var(--secondary)/0.8)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            {rejudgeAllRunning ? "▶ 批量重评中..." : "批量重评（包含已有项目）"}
+          </button>
+          <button
+            onClick={stopBatchNow}
+            disabled={!batchRunning && !rejudgeAllRunning}
             className="w-56 bg-destructive text-destructive-foreground font-bold py-4 text-sm tracking-wider hover:shadow-[0_0_18px_hsl(var(--destructive)/0.8)] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {t("judge.stopBtn")}
@@ -442,6 +642,10 @@ export default function Index() {
           delayMs={delayMs}
           onDelayChange={setDelayMs}
           progress={progress}
+          isRunning={batchRunning || rejudgeAllRunning}
+          startedAtMs={batchStartedAtMs}
+          lastProgressAtMs={lastProgressAtMs}
+          lastDurationMs={lastBatchDurationMs}
           onCollapseAll={() => setReports((r) => r.map((x) => ({ ...x, open: false })))}
           onExpandAll={() => setReports((r) => r.map((x) => ({ ...x, open: true })))}
           onClear={() => setReports([])}

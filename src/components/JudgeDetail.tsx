@@ -10,9 +10,10 @@ interface Props {
   /** 与「我的提交」页 URL 的 round_id 一致，避免多轮次时拉错裁决 JSON */
   roundId?: string | null;
   onClose: () => void;
+  onReauditDone?: () => void;
 }
 
-export default function JudgeDetail({ fileName, roundId, onClose }: Props) {
+export default function JudgeDetail({ fileName, roundId, onClose, onReauditDone }: Props) {
   const { t } = useI18n();
   const [result, setResult] = useState<JudgeResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,7 @@ export default function JudgeDetail({ fileName, roundId, onClose }: Props) {
   const [selectedModels, setSelectedModels] = useState<string[]>(["deepseek", "doubao"]);
   const [outputLang, setOutputLang] = useState<"zh" | "en">("zh");
   const [customPrompt, setCustomPrompt] = useState("");
+  const [lastRuleVersionID, setLastRuleVersionID] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -62,8 +64,14 @@ export default function JudgeDetail({ fileName, roundId, onClose }: Props) {
         output_lang: outputLang,
         round_id: roundId ?? undefined,
       });
+      if (!data.rule_version_id) {
+        setRunError("重评结果缺少 rule_version_id，请检查后端规则配置");
+      } else {
+        setLastRuleVersionID(data.rule_version_id);
+      }
       setResult(data as unknown as JudgeResult);
       setActiveTab("detail");
+      onReauditDone?.();
     } catch (e: any) {
       setRunError(e?.message || "再次评估失败");
     } finally {
@@ -185,6 +193,11 @@ export default function JudgeDetail({ fileName, roundId, onClose }: Props) {
               {running ? "评估中..." : "开始再次AI评估"}
             </button>
           </div>
+          {lastRuleVersionID ? (
+            <div className="text-[11px] text-muted-foreground">
+              本次重评规则版本：<span className="font-mono text-foreground/90">{lastRuleVersionID}</span>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

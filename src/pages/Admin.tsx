@@ -235,6 +235,7 @@ export default function Admin() {
               titleMap={rankingTitleMap}
               adminWallet={wallet.address ?? null}
               roundId={effectiveRound}
+              showDuelPanel={false}
             />
           </>
         )}
@@ -243,7 +244,7 @@ export default function Admin() {
           canViewSubmissions ? (
             <>
               <div className="flex gap-0 mb-2 border-b border-border">
-                {(["all", "beginner", "longterm"] as const).map((f) => (
+                {(["all", "beginner", "longterm", "org"] as const).map((f) => (
                   <button
                     key={f}
                     onClick={() => setBuilderFilter(f)}
@@ -251,7 +252,13 @@ export default function Admin() {
                       builderFilter === f ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {f === "all" ? t("admin.filterAll") : f === "beginner" ? t("admin.filterBeginner") : t("admin.filterLongterm")}
+                    {f === "all"
+                      ? t("admin.filterAll")
+                      : f === "beginner"
+                        ? t("admin.filterBeginner")
+                        : f === "longterm"
+                          ? t("admin.filterLongterm")
+                          : t("admin.filterOrg")}
                   </button>
                 ))}
               </div>
@@ -297,7 +304,17 @@ export default function Admin() {
         )}
 
         {tab === "submissions" && selectedFile && (
-          <JudgeDetail fileName={selectedFile} roundId={roundQ} onClose={() => setSelectedFile(null)} />
+          <JudgeDetail
+            fileName={selectedFile}
+            roundId={roundQ}
+            onClose={() => setSelectedFile(null)}
+            onReauditDone={() => {
+              Promise.all([fetchRankings(roundQ), fetchFileTitles(roundQ)]).then(([r, t]) => {
+                setRankings(r);
+                setTitleMap(t);
+              });
+            }}
+          />
         )}
       </div>
     </div>
@@ -377,10 +394,19 @@ function SubmissionsTab({
   };
 
   const builderTag = (s: SubmissionItem) => {
+    const ownerType = (s.github_repo_owner_type ?? "").toLowerCase().trim();
+    if (ownerType === "organization") return null;
     const years = s.github_account_years;
     if (typeof years !== "number" || Number.isNaN(years)) return null;
     if (years <= 1) return t("admin.builderTagBeginner");
     if (years >= 3) return t("admin.builderTagLongterm");
+    return null;
+  };
+
+  const ownerTypeTag = (s: SubmissionItem) => {
+    const ownerType = (s.github_repo_owner_type ?? "").toLowerCase().trim();
+    if (ownerType === "organization") return t("admin.ownerTypeOrg");
+    if (ownerType === "user") return t("admin.ownerTypeUser");
     return null;
   };
 
@@ -401,6 +427,11 @@ function SubmissionsTab({
                 <span className="text-xs text-muted-foreground whitespace-nowrap" title={t("admin.accountYears")}>
                   {accountYearsLabel(s)}
                 </span>
+                {ownerTypeTag(s) && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium border border-border">
+                    {ownerTypeTag(s)}
+                  </span>
+                )}
                 {builderTag(s) && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
                     {builderTag(s)}

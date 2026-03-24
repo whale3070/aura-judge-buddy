@@ -290,6 +290,7 @@ const translations = {
   "admin.filterAll": { zh: "全部", en: "All" },
   "admin.filterBeginner": { zh: "小白", en: "Beginner" },
   "admin.filterLongterm": { zh: "长期 Builder", en: "Long-term Builder" },
+  "admin.filterOrg": { zh: "组织", en: "Organization" },
   "admin.accountYears": { zh: "账号年限", en: "Account years" },
   "admin.accountYearsValue": { zh: "{n} 年", en: "{n} yr" },
   "admin.accountYearsFetching": { zh: "获取中", en: "Fetching..." },
@@ -310,6 +311,8 @@ const translations = {
   },
   "admin.builderTagBeginner": { zh: "小白", en: "Beginner" },
   "admin.builderTagLongterm": { zh: "长期", en: "Long-term" },
+  "admin.ownerTypeOrg": { zh: "组织账号", en: "Organization" },
+  "admin.ownerTypeUser": { zh: "个人账号", en: "Individual" },
   "admin.batchIngestTitle": { zh: "批量导入 GitHub（生成 word 并可选自动裁决）", en: "Batch GitHub ingest (word + optional auto-audit)" },
   "admin.batchIngestDesc": {
     zh: "每行一个 https://github.com/owner/repo 链接。后台 git clone 后写入 README 到 word 目录；若勾选自动裁决则按 AURA_AUTO_MODELS 调用 LLM（与表单提交一致）。重复仓库可跳过。",

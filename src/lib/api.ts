@@ -51,9 +51,11 @@ export interface SubmissionItem {
   github_enrich_error?: string;
   /** 后端稳定状态码：success|rate_limited|unauthorized|not_found|network|invalid_url|parse_error|unknown */
   github_enrich_status?: string;
+  /** GitHub 仓库 owner 类型：user | organization */
+  github_repo_owner_type?: string;
 }
 
-export type BuilderFilter = "all" | "beginner" | "longterm";
+export type BuilderFilter = "all" | "beginner" | "longterm" | "org";
 
 export interface AdminConfig {
   admin_hash?: string;

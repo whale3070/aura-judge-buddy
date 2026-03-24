@@ -10,6 +10,12 @@ function resolveApiBase(): string {
     const t = custom.trim().replace(/\/$/, "");
     if (t) return t;
   }
+  // Self-host default: if frontend runs on a public host, prefer same-host backend on :8888.
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    const host = window.location.hostname;
+    const proto = window.location.protocol === "https:" ? "https" : "http";
+    return `${proto}://${host}:8888`;
+  }
   return `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/api-proxy`;
 }
 
@@ -77,10 +83,37 @@ interface RequestOptions {
   admin?: boolean;
   /** 已连接的钱包地址；若为空则回退 localStorage aura_admin_wallet */
   adminWalletAddress?: string;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+function mergeAbortSignals(signal?: AbortSignal, timeoutMs?: number): AbortSignal | undefined {
+  if (!signal && (!timeoutMs || timeoutMs <= 0)) return signal;
+  const ac = new AbortController();
+  let timer: number | undefined;
+
+  const abortNow = () => {
+    if (!ac.signal.aborted) ac.abort();
+    if (timer != null) {
+      window.clearTimeout(timer);
+      timer = undefined;
+    }
+  };
+
+  if (signal) {
+    if (signal.aborted) abortNow();
+    else signal.addEventListener("abort", abortNow, { once: true });
+  }
+
+  if (timeoutMs && timeoutMs > 0) {
+    timer = window.setTimeout(abortNow, timeoutMs);
+  }
+
+  return ac.signal;
 }
 
 export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, admin = false, adminWalletAddress } = opts;
+  const { method = "GET", body, admin = false, adminWalletAddress, signal, timeoutMs } = opts;
   const headers: Record<string, string> = {};
 
   if (body && !(body instanceof FormData)) {
@@ -93,9 +126,11 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     headers["X-Admin-Wallet"] = w;
   }
 
+  const mergedSignal = mergeAbortSignals(signal, timeoutMs);
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers,
+    signal: mergedSignal,
     body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : undefined,
   });
 
@@ -205,7 +240,7 @@ export interface AuditOptions {
   round_id?: string;
 }
 
-export function submitAuditAPI(opts: AuditOptions): Promise<SavedResult> {
+export function submitAuditAPI(opts: AuditOptions, signal?: AbortSignal): Promise<SavedResult> {
   const body: Record<string, any> = {
     target_file: opts.target_file,
     custom_prompt: opts.custom_prompt,
@@ -220,7 +255,7 @@ export function submitAuditAPI(opts: AuditOptions): Promise<SavedResult> {
       body.project_keywords = opts.project_keywords;
     }
   }
-  return request<SavedResult>("/api/audit", { method: "POST", body });
+  return request<SavedResult>("/api/audit", { method: "POST", body, signal, timeoutMs: 125000 });
 }
 
 export function fetchRankingsAPI(queryRoundId?: string | null): Promise<SavedResult[]> {
