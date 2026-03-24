@@ -10,7 +10,7 @@ import {
   type SubmissionItem,
   type BuilderFilter,
 } from "@/lib/api";
-import { roundNavSuffix } from "@/lib/apiClient";
+import { effectiveRoundIdFromSearchParam, roundNavSuffix } from "@/lib/apiClient";
 import { toast } from "sonner";
 import JudgeDetail from "@/components/JudgeDetail";
 import GradeRankingPanel from "@/components/GradeRankingPanel";

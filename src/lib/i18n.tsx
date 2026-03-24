@@ -606,14 +606,23 @@ const I18nContext = createContext<I18nContextType>({
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Lang>(() => {
-    const saved = localStorage.getItem("lang");
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem("lang");
+    } catch {
+      saved = null;
+    }
     return saved === "en" ? "en" : "zh";
   });
 
   const toggleLang = useCallback(() => {
     setLang((prev) => {
       const next = prev === "zh" ? "en" : "zh";
-      localStorage.setItem("lang", next);
+      try {
+        localStorage.setItem("lang", next);
+      } catch {
+        // Ignore storage failures (privacy mode / disabled storage).
+      }
       return next;
     });
   }, []);

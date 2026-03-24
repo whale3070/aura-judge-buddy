@@ -56,11 +56,19 @@ export function withRoundQuery(path: string, queryRoundId?: string | null): stri
 const ADMIN_WALLET_KEY = "aura_admin_wallet";
 
 export function getAdminWallet(): string | null {
-  return localStorage.getItem(ADMIN_WALLET_KEY);
+  try {
+    return localStorage.getItem(ADMIN_WALLET_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export function setAdminWallet(wallet: string) {
-  localStorage.setItem(ADMIN_WALLET_KEY, wallet);
+  try {
+    localStorage.setItem(ADMIN_WALLET_KEY, wallet);
+  } catch {
+    // Ignore storage failures (privacy mode / disabled storage).
+  }
 }
 
 interface RequestOptions {
@@ -247,11 +255,10 @@ export async function fetchFileProjectTitlesAPI(queryRoundId?: string | null): P
 
 /** @param queryRoundId 传给 Supabase file-titles，使其请求 /api/submissions?round_id=（与当前轮次一致） */
 export function fetchFileTitlesAPI(queryRoundId?: string | null): Promise<Record<string, string>> {
-  const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
-  const rid = effectiveRoundIdFromSearchParam(queryRoundId);
-  const q = rid ? `?round_id=${encodeURIComponent(rid)}` : "";
-  return fetch(`https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/file-titles${q}`)
-    .then((r) => (r.ok ? r.json() : {}))
+  // Prefer backend-native endpoint to avoid extra dependency on Supabase Edge Function.
+  // Response shape: { "1774..._00_README.md": "Project Title" }
+  return request<Record<string, string>>(withRoundQuery("/api/file-project-titles", queryRoundId))
+    .then((data) => (data && typeof data === "object" ? data : {}))
     .catch(() => ({}));
 }
 

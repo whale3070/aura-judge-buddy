@@ -36,13 +36,21 @@ serve(async (req) => {
       });
     }
 
-    const raw = await res.json();
-    // Go/Gin 可能对 nil slice 编码为 JSON null；builder 筛选无结果时也可能为 null
-    const submissions = Array.isArray(raw)
-      ? raw
-      : (raw && typeof raw === "object" && Array.isArray((raw as { submissions?: unknown }).submissions)
-        ? (raw as { submissions: unknown[] }).submissions
-        : []);
+    const raw: unknown = await res.json();
+    // 兼容多种后端返回结构，避免出现“not iterable”：
+    // - [] (直接数组)
+    // - { submissions: [] }
+    // - { data: [] }（部分代理/包装层）
+    // - null / 非数组（回退为空）
+    const extractSubmissions = (v: unknown): unknown[] => {
+      if (Array.isArray(v)) return v;
+      if (!v || typeof v !== "object") return [];
+      const obj = v as Record<string, unknown>;
+      if (Array.isArray(obj.submissions)) return obj.submissions;
+      if (Array.isArray(obj.data)) return obj.data;
+      return [];
+    };
+    const submissions = extractSubmissions(raw);
     const titleMap: Record<string, string> = {};
 
     for (const sub of submissions) {

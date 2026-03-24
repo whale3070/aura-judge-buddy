@@ -1,0 +1,15 @@
+{
+  "active_id": "rule_1774165476_f9e254",
+  "versions": [
+    {
+      "id": "rule_1774165476_f9e254",
+      "file_name": "rule_1774165476_f9e254.yaml",
+      "name": "TON 黑客松 · 五维0-20 阶梯分档 v2",
+      "version": "2.0.0",
+      "uploaded_at": "2026-03-22T07:44:36.274010381Z",
+      "uploaded_by": "0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d",
+      "sha256": "2f393d3e720490847828fe978ad21b614150e6c59205a6278c7a2078a561119f",
+      "is_active": true
+    }
+  ]
+}
