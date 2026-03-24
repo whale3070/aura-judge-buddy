@@ -6,6 +6,7 @@ import {
   fetchRankingsAPI,
   fetchAdminConfigAPI,
   fetchFileTitlesAPI,
+  fetchFileForkStatusesAPI,
   fetchRuleVersionsAPI,
   type AuditReport,
   type SavedResult,
@@ -90,6 +91,7 @@ export default function Index() {
   const [selectedModels, setSelectedModels] = useState(["deepseek", "doubao"]);
   const [rankings, setRankings] = useState<SavedResult[]>([]);
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
+  const [forkMap, setForkMap] = useState<Record<string, boolean>>({});
   const [rankingsLoading, setRankingsLoading] = useState(true);
   const [reports, setReports] = useState<ReportEntry[]>([]);
   const [running, setRunning] = useState(false);
@@ -117,10 +119,11 @@ export default function Index() {
   }, [roundQ]);
 
   const loadData = useCallback(async () => {
-    const [f, r, t, ver] = await Promise.all([
+    const [f, r, t, fk, ver] = await Promise.all([
       fetchFilesAPI(roundQ).catch(() => []),
       fetchRankingsAPI(roundQ).catch(() => []),
       fetchFileTitlesAPI(roundQ).catch(() => ({} as Record<string, string>)),
+      fetchFileForkStatusesAPI(roundQ).catch(() => ({} as Record<string, boolean>)),
       fetchRuleVersionsAPI(roundQ).catch(() => ({ versions: [] as RuleVersionMeta[] })),
     ]);
     setFiles(f);
@@ -128,6 +131,7 @@ export default function Index() {
     setFilesLoading(false);
     setRankings(r);
     setTitleMap(t);
+    setForkMap(fk);
     setVersionMetas(ver.versions ?? []);
     setRankingsLoading(false);
   }, [roundQ]);
@@ -508,6 +512,7 @@ export default function Index() {
             rankings={filteredRankings}
             loading={rankingsLoading}
             titleMap={titleMap}
+            forkMap={forkMap}
             adminWallet={adminWalletForDuel || null}
             roundId={effectiveRound}
             showDuelPanel={true}

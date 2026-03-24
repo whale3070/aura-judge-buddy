@@ -148,6 +148,17 @@ export default function Admin() {
     return m;
   }, [titleMap, submissions]);
 
+  const rankingForkMap = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    for (const s of submissions) {
+      if (!s.github_repo_is_fork) continue;
+      for (const f of s.md_files || []) {
+        if (f) m[f] = true;
+      }
+    }
+    return m;
+  }, [submissions]);
+
   if (configLoading) {
     return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">LOADING...</div>;
   }
@@ -186,6 +197,12 @@ export default function Admin() {
             </Link>
             <Link to="/rounds" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
               {t("nav.rounds")}
+            </Link>
+            <Link
+              to={`/ranking${roundNavSuffix(roundQ)}`}
+              className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors"
+            >
+              {t("nav.tracks")}
             </Link>
             <Link to="/rules" className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
               {t("nav.rules")}
@@ -233,6 +250,7 @@ export default function Admin() {
               rankings={rankings}
               loading={rankingsLoading}
               titleMap={rankingTitleMap}
+              forkMap={rankingForkMap}
               adminWallet={wallet.address ?? null}
               roundId={effectiveRound}
               showDuelPanel={false}
@@ -307,6 +325,7 @@ export default function Admin() {
           <JudgeDetail
             fileName={selectedFile}
             roundId={roundQ}
+            isForked={submissions.some((s) => (s.md_files || []).includes(selectedFile) && !!s.github_repo_is_fork)}
             onClose={() => setSelectedFile(null)}
             onReauditDone={() => {
               Promise.all([fetchRankings(roundQ), fetchFileTitles(roundQ)]).then(([r, t]) => {
@@ -352,8 +371,8 @@ function SubmissionsTab({
 
   const submissionDisplayTitle = (s: SubmissionItem) => {
     const tier = bestLetterTierForSubmission(s, rankByFile);
-    if (tier === null) return s.project_title;
-    return `${t("admin.projectGradeBracket", { tier })}${s.project_title}`;
+    const tierPrefix = tier === null ? "" : t("admin.projectGradeBracket", { tier });
+    return `${tierPrefix}${s.project_title}`;
   };
 
   const handleDelete = async (id: string, title: string) => {
@@ -420,7 +439,14 @@ function SubmissionsTab({
               className="flex-1 min-w-0 flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors gap-3"
             >
               <div className="min-w-0">
-                <div className="font-bold text-foreground/90 truncate">{submissionDisplayTitle(s)}</div>
+                <div className="font-bold text-foreground/90 truncate flex items-center gap-2">
+                  <span className="truncate">{submissionDisplayTitle(s)}</span>
+                  {s.github_repo_is_fork ? (
+                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive border border-destructive/40 font-semibold">
+                      Forked
+                    </span>
+                  ) : null}
+                </div>
                 <div className="text-xs text-muted-foreground mt-0.5 truncate">{s.one_liner}</div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

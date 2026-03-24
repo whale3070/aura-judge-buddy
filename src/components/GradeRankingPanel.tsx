@@ -79,6 +79,8 @@ interface Props {
   rankings: RankingItem[];
   loading: boolean;
   titleMap: Record<string, string>;
+  /** file_name -> whether repo is forked */
+  forkMap?: Record<string, boolean>;
   /** 管理员钱包地址，用于调用 /api/duel */
   adminWallet?: string | null;
   /** 与 URL ?round_id= 一致，拉取 judge-result / file-content 时用 */
@@ -92,6 +94,7 @@ export default function GradeRankingPanel({
   rankings,
   loading,
   titleMap,
+  forkMap = {},
   adminWallet,
   roundId,
   showDuelPanel = true,
@@ -237,7 +240,14 @@ export default function GradeRankingPanel({
                           >
                             <span className="text-muted-foreground text-sm w-8 shrink-0">#{i + 1}</span>
                             <div className="min-w-0 flex-1">
-                              <div className="font-bold text-foreground/90 truncate">{p.title}</div>
+                              <div className="font-bold text-foreground/90 truncate flex items-center gap-2">
+                                <span className="truncate">{p.title}</span>
+                                {forkMap[p.item.file_name] ? (
+                                  <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive border border-destructive/40 font-semibold">
+                                    Forked
+                                  </span>
+                                ) : null}
+                              </div>
                               {p.title !== p.item.file_name && (
                                 <div className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
                                   {p.item.file_name}
@@ -258,6 +268,7 @@ export default function GradeRankingPanel({
                               <JudgeDetail
                                 fileName={p.item.file_name}
                                 roundId={roundId}
+                                isForked={!!forkMap[p.item.file_name]}
                                 onClose={() => setSelectedFile(null)}
                                 onReauditDone={onReauditDone}
                               />

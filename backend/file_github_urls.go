@@ -27,6 +27,22 @@ func getFileGithubURLs(c *gin.Context) {
 	c.JSON(http.StatusOK, m)
 }
 
+// GET /api/file-fork-statuses?round_id=... → { "文件名": true/false }
+// Public endpoint used by frontend to show unified Forked badge.
+func getFileForkStatuses(c *gin.Context) {
+	roundID, err := sanitizeRoundIDOrDefault(c.Query("round_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 round_id"})
+		return
+	}
+	m, err := buildFileForkStatusMap(roundID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法构建文件与 Fork 状态映射"})
+		return
+	}
+	c.JSON(http.StatusOK, m)
+}
+
 // buildFileGithubURLMap 遍历 submissions/<round_id>/ 下 submission.json，将每条提交在对应 word/<round_id>/ 中关联的 .md 文件名映射到其 github_url。
 // 若同一文件名被多次关联（异常数据），保留 CreatedAt 较新的提交。
 func buildFileGithubURLMap(roundID string) (map[string]string, error) {
@@ -74,6 +90,56 @@ func buildFileGithubURLMap(roundID string) (map[string]string, error) {
 			if prev, ok := bestAt[name]; !ok || ts >= prev {
 				bestAt[name] = ts
 				out[name] = url
+			}
+		}
+	}
+
+	return out, nil
+}
+
+// buildFileForkStatusMap 遍历 submissions/<round_id>/ 下 submission.json，
+// 将对应 word/<round_id>/ 中关联的 .md 文件名映射到 github_repo_is_fork。
+func buildFileForkStatusMap(roundID string) (map[string]bool, error) {
+	out := make(map[string]bool)
+	bestAt := make(map[string]int64)
+
+	entries, err := os.ReadDir(submissionRoundDirFor(roundID))
+	if err != nil {
+		return nil, err
+	}
+	wordEntries, err := os.ReadDir(wordDirFor(roundID))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		subID := e.Name()
+		metaPath := filepath.Join(submissionRoundDirFor(roundID), subID, "submission.json")
+		data, err := os.ReadFile(metaPath)
+		if err != nil {
+			continue
+		}
+		var rec SubmissionRecord
+		if json.Unmarshal(data, &rec) != nil {
+			continue
+		}
+
+		prefix := subID + "_"
+		ts := rec.CreatedAt.UnixNano()
+		for _, we := range wordEntries {
+			if we.IsDir() {
+				continue
+			}
+			name := we.Name()
+			if !strings.HasPrefix(name, prefix) || !strings.EqualFold(filepath.Ext(name), ".md") {
+				continue
+			}
+			if prev, ok := bestAt[name]; !ok || ts >= prev {
+				bestAt[name] = ts
+				out[name] = rec.GithubRepoIsFork
 			}
 		}
 	}

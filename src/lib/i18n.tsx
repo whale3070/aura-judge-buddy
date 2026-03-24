@@ -464,6 +464,7 @@ const translations = {
   "judges.lastSaved": { zh: "上次保存", en: "Last saved" },
   "judges.resetDraft": { zh: "还原", en: "Reset" },
   "nav.rounds": { zh: "📅 轮次管理", en: "📅 Rounds" },
+  "nav.tracks": { zh: "赛道管理", en: "Tracks" },
   "nav.rules": { zh: "🧩 规则管理", en: "🧩 Rules" },
 
   // Rules Management

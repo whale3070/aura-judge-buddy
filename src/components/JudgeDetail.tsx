@@ -9,11 +9,12 @@ interface Props {
   fileName: string;
   /** 与「我的提交」页 URL 的 round_id 一致，避免多轮次时拉错裁决 JSON */
   roundId?: string | null;
+  isForked?: boolean;
   onClose: () => void;
   onReauditDone?: () => void;
 }
 
-export default function JudgeDetail({ fileName, roundId, onClose, onReauditDone }: Props) {
+export default function JudgeDetail({ fileName, roundId, isForked = false, onClose, onReauditDone }: Props) {
   const { t } = useI18n();
   const [result, setResult] = useState<JudgeResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,8 +83,13 @@ export default function JudgeDetail({ fileName, roundId, onClose, onReauditDone 
   return (
     <div className="border-2 border-primary/30 p-5 mb-6 bg-card relative animate-fade-in">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-primary text-lg tracking-[2px] font-display font-bold">
-          {t("judgeDetail.title")}{fileName}
+        <h3 className="text-primary text-lg tracking-[2px] font-display font-bold flex items-center gap-2">
+          <span>{t("judgeDetail.title")}{fileName}</span>
+          {isForked ? (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive border border-destructive/40 font-semibold">
+              Forked
+            </span>
+          ) : null}
         </h3>
         <button
           onClick={onClose}

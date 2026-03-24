@@ -258,8 +258,13 @@ export function submitAuditAPI(opts: AuditOptions, signal?: AbortSignal): Promis
   return request<SavedResult>("/api/audit", { method: "POST", body, signal, timeoutMs: 125000 });
 }
 
-export function fetchRankingsAPI(queryRoundId?: string | null): Promise<SavedResult[]> {
-  return request<SavedResult[]>(withRoundQuery("/api/ranking?prefer_search=1", queryRoundId)).catch(() => []);
+export function fetchRankingsAPI(queryRoundId?: string | null, track?: string | null): Promise<SavedResult[]> {
+  let path = withRoundQuery("/api/ranking?prefer_search=1", queryRoundId);
+  const tr = (track ?? "").trim();
+  if (tr) {
+    path += (path.includes("?") ? "&" : "?") + `track=${encodeURIComponent(tr)}`;
+  }
+  return request<SavedResult[]>(path).catch(() => []);
 }
 
 /**
@@ -269,6 +274,19 @@ export function fetchRankingsAPI(queryRoundId?: string | null): Promise<SavedRes
 export async function fetchFileGithubUrlsAPI(queryRoundId?: string | null): Promise<Record<string, string>> {
   try {
     const data = await request<Record<string, string>>(withRoundQuery("/api/file-github-urls", queryRoundId));
+    return data && typeof data === "object" ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * 可选：GET /api/file-fork-statuses → { "readme文件名": true/false }
+ * 无此接口时返回 {}，不影响页面。
+ */
+export async function fetchFileForkStatusesAPI(queryRoundId?: string | null): Promise<Record<string, boolean>> {
+  try {
+    const data = await request<Record<string, boolean>>(withRoundQuery("/api/file-fork-statuses", queryRoundId));
     return data && typeof data === "object" ? data : {};
   } catch {
     return {};

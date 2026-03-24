@@ -75,6 +75,8 @@ interface Props {
   rankings: SavedResult[];
   loading: boolean;
   titleMap: Record<string, string>;
+  /** readme 文件名 -> fork 状态 */
+  fileForkMap?: Record<string, boolean>;
   /** readme 文件名 → 提交时 GitHub 仓库 URL（可选接口 /api/file-github-urls） */
   fileGithubMap?: Record<string, string>;
   emptyHint?: string;
@@ -86,6 +88,7 @@ export default function RankingByTierPanel({
   rankings,
   loading,
   titleMap,
+  fileForkMap = {},
   fileGithubMap = {},
   emptyHint,
 }: Props) {
@@ -215,7 +218,14 @@ export default function RankingByTierPanel({
                                 {i + 1}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <span className="font-bold text-foreground/90 block truncate">{displayTitle}</span>
+                                <span className="font-bold text-foreground/90 block truncate flex items-center gap-2">
+                                  <span className="truncate">{displayTitle}</span>
+                                  {fileForkMap[item.file_name] ? (
+                                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive border border-destructive/40 font-semibold">
+                                      Forked
+                                    </span>
+                                  ) : null}
+                                </span>
                                 {showFile && (
                                   <span className="text-[10px] text-muted-foreground font-mono truncate block mt-0.5">
                                     {item.file_name}
@@ -239,8 +249,13 @@ export default function RankingByTierPanel({
                             onClick={() => openDetail(item)}
                             className="text-left rounded-md border border-border bg-card/80 hover:bg-secondary/10 hover:border-secondary/40 px-4 py-3 min-h-[88px] transition-colors shadow-sm hover:shadow-[0_0_16px_hsl(var(--primary)/0.12)]"
                           >
-                            <span className="font-bold text-foreground/90 block line-clamp-2 leading-snug">
-                              {displayTitle}
+                            <span className="font-bold text-foreground/90 block line-clamp-2 leading-snug flex items-center gap-2">
+                              <span className="line-clamp-2">{displayTitle}</span>
+                              {fileForkMap[item.file_name] ? (
+                                <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive border border-destructive/40 font-semibold">
+                                  Forked
+                                </span>
+                              ) : null}
                             </span>
                             {showFile && (
                               <span className="text-[10px] text-muted-foreground font-mono truncate block mt-2">
@@ -265,7 +280,14 @@ export default function RankingByTierPanel({
             <DialogTitle className="text-primary space-y-1">
               {selected && (
                 <>
-                  <span className="block">{displayLabel(selected, titleMap)}</span>
+                  <span className="block flex items-center gap-2">
+                    <span className="truncate">{displayLabel(selected, titleMap)}</span>
+                    {fileForkMap[selected.file_name] ? (
+                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive border border-destructive/40 font-semibold">
+                        Forked
+                      </span>
+                    ) : null}
+                  </span>
                   {displayLabel(selected, titleMap) !== selected.file_name ? (
                     <span className="block text-xs font-mono text-muted-foreground font-normal">
                       {selected.file_name}

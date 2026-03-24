@@ -24,6 +24,7 @@ import (
 
 type SubmissionForm struct {
 	RoundID      string `json:"round_id,omitempty"`
+	Track        string `json:"track,omitempty"`
 	ProjectTitle string `json:"project_title"`
 	OneLiner     string `json:"one_liner,omitempty"`
 	Problem      string `json:"problem,omitempty"`
@@ -628,6 +629,11 @@ func getRanking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid round_id"})
 		return
 	}
+	trackFilter := normalizeTrackID(c.Query("track"))
+	if strings.TrimSpace(c.Query("track")) != "" && trackFilter == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid track"})
+		return
+	}
 	rows, err := loadRanking(roundID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "load ranking failed"})
@@ -636,18 +642,31 @@ func getRanking(c *gin.Context) {
 	activeYAML, _, _ := loadEffectiveRuleYAMLForRound(roundID)
 	highTier := strings.ToUpper(strings.TrimSpace(os.Getenv("AURA_ORIGINALITY_DOWNGRADE_HIGH")))
 	medTier := strings.ToUpper(strings.TrimSpace(os.Getenv("AURA_ORIGINALITY_DOWNGRADE_MEDIUM")))
+	filtered := make([]SavedResult, 0, len(rows))
 	for i := range rows {
 		if strings.TrimSpace(rows[i].LetterGrade) == "" {
 			rows[i].LetterGrade = gradeFromBands(rows[i].AvgScore, activeYAML)
 		}
 		subID := parseSubmissionIDFromStandardReadmeWordFile(rows[i].FileName)
 		if !submissionFolderIDOK(subID) {
+			if trackFilter == "" {
+				filtered = append(filtered, rows[i])
+			}
 			continue
 		}
 		metaPath := filepath.Join(submissionRoundDirFor(roundID), subID, "submission.json")
 		var rec SubmissionRecord
 		if err := readJSONFile(metaPath, &rec); err != nil {
+			if trackFilter == "" {
+				filtered = append(filtered, rows[i])
+			}
 			continue
+		}
+		if trackFilter != "" {
+			rowTrack := detectSubmissionTrack(&rec, roundID, subID)
+			if rowTrack != trackFilter {
+				continue
+			}
 		}
 		target := ""
 		if rec.GithubOriginalityStatus == "high_risk" {
@@ -667,9 +686,69 @@ func getRanking(c *gin.Context) {
 			rows[i].AvgScore = 65
 			rows[i].LetterGrade = "C"
 		}
+		filtered = append(filtered, rows[i])
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].AvgScore > rows[j].AvgScore })
-	c.JSON(http.StatusOK, rows)
+	sort.Slice(filtered, func(i, j int) bool { return filtered[i].AvgScore > filtered[j].AvgScore })
+	c.JSON(http.StatusOK, filtered)
+}
+
+func normalizeTrackID(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	switch s {
+	case "", "all":
+		return ""
+	case "agent_infra", "agent-infra", "agentinfrastructure", "infrastructure":
+		return "agent_infra"
+	case "user_facing", "user-facing", "userfacing":
+		return "user_facing"
+	default:
+		return ""
+	}
+}
+
+func detectSubmissionTrack(rec *SubmissionRecord, roundID, subID string) string {
+	if rec != nil {
+		t := normalizeTrackID(rec.Form.Track)
+		if t != "" {
+			return t
+		}
+		text := strings.ToLower(strings.Join([]string{
+			rec.Form.ProjectTitle,
+			rec.Form.OneLiner,
+			rec.Form.Problem,
+			rec.Form.Solution,
+			rec.Form.DocsText,
+			rec.Form.WhyThisChain,
+		}, "\n"))
+		if hasAny(text, "agent infrastructure", "基础设施", "tooling and primitives", "developer tools") {
+			return "agent_infra"
+		}
+		if hasAny(text, "user-facing ai agents", "user-facing", "telegram", "payment bots", "assistants", "automation products", "用户") {
+			return "user_facing"
+		}
+	}
+	if strings.TrimSpace(subID) != "" {
+		p := filepath.Join(wordDirFor(roundID), subID+"_00_README.md")
+		if b, err := os.ReadFile(p); err == nil {
+			s := strings.ToLower(string(b))
+			if hasAny(s, "track: **agent infrastructure", "agent infrastructure alignment", "智能体基础设施") {
+				return "agent_infra"
+			}
+			if hasAny(s, "user-facing ai agents", "inside telegram", "payment bots", "automation products", "用户可交互") {
+				return "user_facing"
+			}
+		}
+	}
+	return "agent_infra"
+}
+
+func hasAny(s string, keys ...string) bool {
+	for _, k := range keys {
+		if strings.Contains(s, strings.ToLower(k)) {
+			return true
+		}
+	}
+	return false
 }
 
 func getJudgeResult(c *gin.Context) {
@@ -750,10 +829,16 @@ func getSubmissions(c *gin.Context) {
 		}
 		switch builderFilter {
 		case "beginner":
+			if strings.ToLower(strings.TrimSpace(sum.GithubRepoOwnerType)) == "organization" {
+				continue
+			}
 			if sum.GithubAccountYears == nil || *sum.GithubAccountYears > 1.0 {
 				continue
 			}
 		case "longterm":
+			if strings.ToLower(strings.TrimSpace(sum.GithubRepoOwnerType)) == "organization" {
+				continue
+			}
 			if sum.GithubAccountYears == nil || *sum.GithubAccountYears < 3.0 {
 				continue
 			}
@@ -1141,6 +1226,7 @@ func postSubmit(c *gin.Context) {
 	subID := fmt.Sprintf("%d_%x", time.Now().UnixNano(), time.Now().UnixNano()%0xffffff)
 	form := SubmissionForm{
 		RoundID:      roundID,
+		Track:        c.PostForm("track"),
 		ProjectTitle: title,
 		OneLiner:     c.PostForm("one_liner"),
 		Problem:      c.PostForm("problem"),
@@ -1449,6 +1535,7 @@ func main() {
 	r.DELETE("/api/submission/:id", deleteSubmission)
 	r.POST("/api/submission/:id/refresh-github", postRefreshSubmissionFromGithub)
 	r.GET("/api/file-github-urls", getFileGithubURLs)
+	r.GET("/api/file-fork-statuses", getFileForkStatuses)
 	r.GET("/api/file-project-titles", getFileProjectTitles)
 	r.POST("/api/duel", postDuel)
 	r.GET("/api/duel-bracket-snapshot", getDuelBracketSnapshot)

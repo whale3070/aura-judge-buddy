@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams, useNavigate } from "react-router-dom";
 import {
   fetchRankingsAPI,
   fetchFileTitlesAPI,
   fetchFileGithubUrlsAPI,
+  fetchFileForkStatusesAPI,
   fetchFileProjectTitlesAPI,
   fetchRuleVersionsAPI,
   roundNavSuffix,
@@ -30,34 +31,46 @@ import { toast } from "sonner";
 export default function Ranking() {
   const { t, lang } = useI18n();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const roundQ = searchParams.get("round_id");
+  const trackQ = (searchParams.get("track") || "").trim();
   const roundIdRequired = sanitizeRoundIdParam(roundQ);
   const [rankings, setRankings] = useState<SavedResult[]>([]);
   const [titleMap, setTitleMap] = useState<Record<string, string>>({});
   const [fileGithubMap, setFileGithubMap] = useState<Record<string, string>>({});
+  const [fileForkMap, setFileForkMap] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [ruleFilterOverride, setRuleFilterOverride] = useState<string | undefined>(undefined);
   const [versionMetas, setVersionMetas] = useState<RuleVersionMeta[]>([]);
 
+  const trackFilter = useMemo(() => {
+    const v = trackQ.toLowerCase();
+    if (v === "agent_infra" || v === "agent-infra") return "agent_infra";
+    if (v === "user_facing" || v === "user-facing") return "user_facing";
+    return "all";
+  }, [trackQ]);
+
   useEffect(() => {
     setRuleFilterOverride(undefined);
-  }, [roundIdRequired]);
+  }, [roundIdRequired, trackFilter]);
 
   useEffect(() => {
     if (!roundIdRequired) return;
     setLoading(true);
     Promise.all([
-      fetchRankingsAPI(roundIdRequired),
+      fetchRankingsAPI(roundIdRequired, trackFilter === "all" ? undefined : trackFilter),
       fetchFileTitlesAPI(roundIdRequired),
       fetchFileGithubUrlsAPI(roundIdRequired),
+      fetchFileForkStatusesAPI(roundIdRequired),
       fetchFileProjectTitlesAPI(roundIdRequired),
       fetchRuleVersionsAPI(roundIdRequired).catch(() => ({ versions: [] })),
     ])
-      .then(([r, titles, githubMap, projectTitles, ver]) => {
+      .then(([r, titles, githubMap, forkMap, projectTitles, ver]) => {
         setRankings(r);
         // 后端 submission 项目名优先于 Supabase file-titles
         setTitleMap({ ...titles, ...projectTitles });
         setFileGithubMap(githubMap);
+        setFileForkMap(forkMap);
         setVersionMetas(ver.versions ?? []);
       })
       .finally(() => setLoading(false));
@@ -107,6 +120,11 @@ export default function Ranking() {
   }
 
   const navSuffix = roundNavSuffix(roundIdRequired);
+  const trackTabs = [
+    { id: "all", label: "全部赛道" },
+    { id: "agent_infra", label: "Agent Infrastructure" },
+    { id: "user_facing", label: "User-Facing AI Agents" },
+  ] as const;
 
   return (
     <div className="min-h-screen bg-background p-5 relative overflow-hidden">
@@ -132,11 +150,30 @@ export default function Ranking() {
           {t("ranking.title")}
         </h1>
         <p className="text-center text-[11px] font-mono text-accent mb-1">
-          round_id={roundIdRequired}
+          round_id={roundIdRequired}{trackFilter !== "all" ? ` · track=${trackFilter}` : ""}
         </p>
         <p className="text-center text-xs text-muted-foreground mb-4">
           {t("ranking.note")}
         </p>
+        <div className="flex gap-0 mb-3 border-b border-border justify-center">
+          {trackTabs.map((tb) => (
+            <button
+              key={tb.id}
+              type="button"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                if (tb.id === "all") next.delete("track");
+                else next.set("track", tb.id);
+                navigate(`/ranking?${next.toString()}`);
+              }}
+              className={`px-4 py-2 text-xs font-bold tracking-wider transition-colors ${
+                trackFilter === tb.id ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tb.label}
+            </button>
+          ))}
+        </div>
         <RankingRuleFilterBar
           value={effectiveRuleFilterId}
           onChange={setRuleFilterOverride}
@@ -150,6 +187,7 @@ export default function Ranking() {
           rankings={filteredRankings}
           loading={loading}
           titleMap={titleMap}
+          fileForkMap={fileForkMap}
           fileGithubMap={fileGithubMap}
           emptyHint={emptyHint}
         />
