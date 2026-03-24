@@ -11,7 +11,9 @@ import {
   type BracketPoolTier,
 } from "@/lib/duelBracketStorage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useI18n } from "@/lib/i18n";
+import { ChevronDown } from "lucide-react";
 import FiveDimRadarChart from "@/components/FiveDimRadarChart";
 import DuelMatchDetail from "@/components/DuelMatchDetail";
 import { syncDuelBracketFromServer } from "@/lib/duelBracketRemote";
@@ -179,71 +181,80 @@ export default function RankingByTierPanel({
           {t("ranking.noBracketUiHint")}
         </p>
       )}
-      <div className="space-y-6">
+      <div className="space-y-3">
         {TIER_ORDER.map((tier) => {
           const list = byTier[tier];
           if (list.length === 0) return null;
+          const tierLabel = tier === "?" ? t("ranking.tierUnknown") : t("ranking.tierSection", { tier });
           return (
-            <div key={tier} className="border border-secondary/40 bg-secondary/[0.04] p-4">
-              <h3 className="text-secondary text-sm font-bold tracking-widest mb-3">
-                {tier === "?"
-                  ? t("ranking.tierUnknown")
-                  : t("ranking.tierSection", { tier })}
-              </h3>
-              {preferBracketOrder ? (
-                <ul className="space-y-1">
-                  {list.map((item, i) => {
-                    const displayTitle = displayLabel(item, titleMap);
-                    const showFile = displayTitle !== item.file_name;
-                    return (
-                      <li key={item.file_name}>
-                        <button
-                          type="button"
-                          onClick={() => openDetail(item)}
-                          className="w-full text-left flex gap-3 items-start px-2 py-2 rounded hover:bg-secondary/10 border border-transparent hover:border-secondary/30 transition-colors"
-                        >
-                          <span className="text-muted-foreground text-sm w-8 shrink-0 tabular-nums pt-0.5">
-                            {i + 1}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <span className="font-bold text-foreground/90 block truncate">{displayTitle}</span>
+            <Collapsible key={tier} defaultOpen={false} className="group border border-secondary/40 bg-secondary/[0.04] rounded-md overflow-hidden">
+              <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-secondary/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+                <div className="min-w-0">
+                  <span className="text-secondary text-sm font-bold tracking-widest">{tierLabel}</span>
+                  <span className="block text-xs text-muted-foreground font-normal mt-0.5">
+                    {t("ranking.tierExpandHint", { n: String(list.length) })}
+                  </span>
+                </div>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="px-4 pb-4 pt-0 border-t border-secondary/20">
+                  {preferBracketOrder ? (
+                    <ul className="space-y-1 pt-3">
+                      {list.map((item, i) => {
+                        const displayTitle = displayLabel(item, titleMap);
+                        const showFile = displayTitle !== item.file_name;
+                        return (
+                          <li key={item.file_name}>
+                            <button
+                              type="button"
+                              onClick={() => openDetail(item)}
+                              className="w-full text-left flex gap-3 items-start px-2 py-2 rounded hover:bg-secondary/10 border border-transparent hover:border-secondary/30 transition-colors"
+                            >
+                              <span className="text-muted-foreground text-sm w-8 shrink-0 tabular-nums pt-0.5">
+                                {i + 1}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold text-foreground/90 block truncate">{displayTitle}</span>
+                                {showFile && (
+                                  <span className="text-[10px] text-muted-foreground font-mono truncate block mt-0.5">
+                                    {item.file_name}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-3">
+                      {list.map((item) => {
+                        const displayTitle = displayLabel(item, titleMap);
+                        const showFile = displayTitle !== item.file_name;
+                        return (
+                          <button
+                            key={item.file_name}
+                            type="button"
+                            onClick={() => openDetail(item)}
+                            className="text-left rounded-md border border-border bg-card/80 hover:bg-secondary/10 hover:border-secondary/40 px-4 py-3 min-h-[88px] transition-colors shadow-sm hover:shadow-[0_0_16px_hsl(var(--primary)/0.12)]"
+                          >
+                            <span className="font-bold text-foreground/90 block line-clamp-2 leading-snug">
+                              {displayTitle}
+                            </span>
                             {showFile && (
-                              <span className="text-[10px] text-muted-foreground font-mono truncate block mt-0.5">
+                              <span className="text-[10px] text-muted-foreground font-mono truncate block mt-2">
                                 {item.file_name}
                               </span>
                             )}
-                          </div>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {list.map((item) => {
-                    const displayTitle = displayLabel(item, titleMap);
-                    const showFile = displayTitle !== item.file_name;
-                    return (
-                      <button
-                        key={item.file_name}
-                        type="button"
-                        onClick={() => openDetail(item)}
-                        className="text-left rounded-md border border-border bg-card/80 hover:bg-secondary/10 hover:border-secondary/40 px-4 py-3 min-h-[88px] transition-colors shadow-sm hover:shadow-[0_0_16px_hsl(var(--primary)/0.12)]"
-                      >
-                        <span className="font-bold text-foreground/90 block line-clamp-2 leading-snug">
-                          {displayTitle}
-                        </span>
-                        {showFile && (
-                          <span className="text-[10px] text-muted-foreground font-mono truncate block mt-2">
-                            {item.file_name}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           );
         })}
       </div>

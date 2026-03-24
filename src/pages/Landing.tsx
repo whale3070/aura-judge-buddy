@@ -1,4 +1,5 @@
 import { useI18n, LanguageToggle } from "@/lib/i18n";
+import PolkadotHackathonArticle from "@/components/PolkadotHackathonArticle";
 
 export default function Landing() {
   const { t } = useI18n();
@@ -9,8 +10,8 @@ export default function Landing() {
         <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-primary/[0.03] animate-scanline" />
       </div>
 
-      <div className="max-w-[800px] mx-auto relative z-10">
-        <div className="border border-primary/40 p-8 shadow-[0_0_30px_hsl(var(--primary)/0.1)] bg-card">
+      <div className="max-w-4xl mx-auto relative z-10 space-y-8 pb-12">
+        <div className="max-w-[800px] mx-auto border border-primary/40 p-8 shadow-[0_0_30px_hsl(var(--primary)/0.1)] bg-card">
           <div className="flex justify-end mb-4">
             <LanguageToggle />
           </div>
@@ -54,6 +55,8 @@ export default function Landing() {
             <p className="text-sm text-muted-foreground mt-3">{t("landing.afterSubmitNote")}</p>
           </section>
         </div>
+
+        <PolkadotHackathonArticle />
       </div>
     </div>
   );

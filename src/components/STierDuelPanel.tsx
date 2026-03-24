@@ -10,6 +10,8 @@ import {
   buildRankOrderFromBracket,
   serializeBracketRounds,
   saveDuelBracketSnapshot,
+  loadDuelBracketSnapshot,
+  type StoredDuelMatch,
 } from "@/lib/duelBracketStorage";
 import { putDuelBracketSnapshotToServer, syncDuelBracketFromServer } from "@/lib/duelBracketRemote";
 import { toast } from "sonner";
@@ -82,6 +84,82 @@ function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+/** 把本场胜负插到名次前部（二者从原序去掉），与自动淘汰赛快照格式兼容 */
+function mergePairIntoRankedOrder(ranked: string[], winner: string, loser: string): string[] {
+  const rest = ranked.filter((f) => f !== winner && f !== loser);
+  return [winner, loser, ...rest];
+}
+
+/**
+ * 手动对决成功后写入快照并同步服务端（自动淘汰本来就会存；此前手动路径未存，排名页读不到）。
+ */
+function persistManualDuelSnapshot(
+  poolTier: DuelPoolTier,
+  roundId: string | null | undefined,
+  fileA: string,
+  fileB: string,
+  res: DuelResponse,
+  poolProjects: DuelProjectOption[],
+  adminWallet: string
+): void {
+  const wf = parseDuelWinnerFile(res, fileA, fileB);
+  if (!wf) return;
+  const loser = wf === fileA ? fileB : fileA;
+  const rid = (roundId ?? "").trim();
+  if (!rid || !adminWallet) return;
+
+  const titleA = poolProjects.find((p) => p.file_name === fileA)?.title ?? fileA;
+  const titleB = poolProjects.find((p) => p.file_name === fileB)?.title ?? fileB;
+  const winnerLabel = wf === fileA ? titleA : titleB;
+
+  const existing = loadDuelBracketSnapshot(rid);
+  const canMerge =
+    existing &&
+    existing.poolTier === poolTier &&
+    (existing.roundId ?? "").trim() === rid;
+
+  const nextRound =
+    canMerge && existing.matches.length > 0
+      ? Math.max(...existing.matches.map((m) => m.round)) + 1
+      : 1;
+
+  const newMatch: StoredDuelMatch = {
+    id: `manual-${Date.now()}`,
+    round: nextRound,
+    title: `${titleA} vs ${titleB}`,
+    status: "done",
+    fileA,
+    fileB,
+    titleA,
+    titleB,
+    winnerFile: wf,
+    winnerLabel,
+    model: res.model,
+    reason: res.reason,
+    dimension_winners: res.dimension_winners,
+    dim_vote_counts: res.dim_vote_counts,
+  };
+
+  const matches = canMerge ? [...existing.matches, newMatch] : [newMatch];
+  const rankedFileNames = canMerge
+    ? mergePairIntoRankedOrder(existing.rankedFileNames, wf, loser)
+    : [wf, loser];
+
+  const saved = saveDuelBracketSnapshot({
+    poolTier,
+    roundId: rid,
+    rankedFileNames,
+    matches,
+  });
+  if (saved) {
+    void putDuelBracketSnapshotToServer(adminWallet, rid, saved).catch((e) => {
+      toast.error(
+        e instanceof Error ? e.message : "擂台结果已写入本机，同步服务器失败，请检查网络或稍后重试"
+      );
+    });
+  }
 }
 
 export default function STierDuelPanel({ candidates, adminWallet, enabled, roundId }: Props) {
@@ -178,6 +256,7 @@ export default function STierDuelPanel({ candidates, adminWallet, enabled, round
         round_id: roundId ?? undefined,
       });
       setResult(res);
+      persistManualDuelSnapshot(poolTier, roundId, fileA, fileB, res, poolProjects, adminWallet);
     } catch (e: unknown) {
       if (e instanceof Error && e.name === "AbortError") return;
       setErr(e instanceof Error ? e.message : "对决失败");
