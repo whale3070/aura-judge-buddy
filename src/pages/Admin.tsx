@@ -19,6 +19,7 @@ import BatchGithubIngestPanel from "@/components/BatchGithubIngestPanel";
 import { useWallet } from "@/hooks/useWallet";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { letterTierFromReports, type LetterTier } from "@/lib/dimensionTier";
+import { githubRepoDisplayName } from "@/lib/utils";
 
 const TIER_RANK: Record<LetterTier, number> = { S: 5, A: 4, B: 3, C: 2, D: 1, "?": 0 };
 
@@ -139,6 +140,7 @@ export default function Admin() {
     for (const s of submissions) {
       const label =
         (s.project_title || "").trim() ||
+        githubRepoDisplayName(s.github_url) ||
         (s.one_liner || "").trim().slice(0, 80) ||
         `项目 ${s.id}`;
       for (const f of s.md_files || []) {
@@ -382,6 +384,7 @@ function SubmissionsTab({
     try {
       await deleteSubmission(id, adminWallet, queryRoundId);
       onDeleted(id);
+      onRankingsRefresh?.();
     } catch (e: any) {
       alert(e.message || "Delete failed");
     } finally {

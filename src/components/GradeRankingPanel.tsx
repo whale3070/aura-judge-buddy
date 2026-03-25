@@ -10,6 +10,7 @@ import {
   usesRoundRobinLiteRanking,
   tierHasBracketEvidence,
 } from "@/lib/duelBracketStorage";
+import { rankingItemDisplayLabel } from "@/lib/utils";
 
 interface TierConfig {
   tier: LetterTier;
@@ -132,7 +133,7 @@ export default function GradeRankingPanel({
   const mergedProjects = useMemo(() => {
     const projectMap = new Map<string, MergedProject>();
     for (const item of rankings) {
-      const title = titleMap[item.file_name] || item.file_name;
+      const title = rankingItemDisplayLabel(item, titleMap, {});
       const tier = letterTierFromReports(item.reports);
       const existing = projectMap.get(title);
       if (!existing || item.avg_score > existing.item.avg_score) {

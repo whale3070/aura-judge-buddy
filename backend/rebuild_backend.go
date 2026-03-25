@@ -657,9 +657,7 @@ func getRanking(c *gin.Context) {
 		metaPath := filepath.Join(submissionRoundDirFor(roundID), subID, "submission.json")
 		var rec SubmissionRecord
 		if err := readJSONFile(metaPath, &rec); err != nil {
-			if trackFilter == "" {
-				filtered = append(filtered, rows[i])
-			}
+			// submission 已删除或损坏：不再展示孤儿排名行（否则与提交列表数量不一致）
 			continue
 		}
 		if trackFilter != "" {
@@ -685,6 +683,9 @@ func getRanking(c *gin.Context) {
 		case "C":
 			rows[i].AvgScore = 65
 			rows[i].LetterGrade = "C"
+		}
+		if u := strings.TrimSpace(rec.Form.GithubURL); u != "" {
+			rows[i].GithubURL = u
 		}
 		filtered = append(filtered, rows[i])
 	}
@@ -883,6 +884,11 @@ func deleteSubmission(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid round_id"})
 		return
+	}
+	// 同步清理 word 与裁决 JSON，避免 /api/ranking 继续读到已删项目
+	for _, fn := range readmeFilesByPrefix(roundID, subID) {
+		_ = os.Remove(filepath.Join(wordDirFor(roundID), fn))
+		_ = os.Remove(resultPath(roundID, fn))
 	}
 	_ = os.RemoveAll(filepath.Join(submissionRoundDirFor(roundID), subID))
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})

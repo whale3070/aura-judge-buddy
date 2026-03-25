@@ -24,23 +24,32 @@ import {
   type DuelBracketSnapshot,
   type StoredDuelMatch,
 } from "@/lib/duelBracketStorage";
+import { rankingItemDisplayLabel } from "@/lib/utils";
 
 const TIER_ORDER: LetterTier[] = ["S", "A", "B", "C", "D", "?"];
 
 const DIM_EN = ["Innovation", "Technical execution", "Business value", "User experience", "Feasibility"] as const;
 
-function mergeByTitle(rankings: SavedResult[], titleMap: Record<string, string>): SavedResult[] {
+function mergeByTitle(
+  rankings: SavedResult[],
+  titleMap: Record<string, string>,
+  fileGithubMap: Record<string, string>
+): SavedResult[] {
   const map = new Map<string, SavedResult>();
   for (const item of rankings) {
-    const title = titleMap[item.file_name] || item.file_name;
+    const title = rankingItemDisplayLabel(item, titleMap, fileGithubMap);
     const existing = map.get(title);
     if (!existing || item.avg_score > existing.avg_score) map.set(title, item);
   }
   return Array.from(map.values());
 }
 
-function displayLabel(item: SavedResult, titleMap: Record<string, string>): string {
-  return titleMap[item.file_name] || item.file_name;
+function displayLabel(
+  item: SavedResult,
+  titleMap: Record<string, string>,
+  fileGithubMap: Record<string, string>
+): string {
+  return rankingItemDisplayLabel(item, titleMap, fileGithubMap);
 }
 
 function resolveGithubUrl(item: SavedResult, fileGithubMap: Record<string, string>): string | undefined {
@@ -55,9 +64,10 @@ function sortWithinTier(
   tier: LetterTier,
   snap: DuelBracketSnapshot | null,
   titleMap: Record<string, string>,
-  fileAliases: Map<string, string[]>
+  fileAliases: Map<string, string[]>,
+  fileGithubMap: Record<string, string>
 ): SavedResult[] {
-  const label = (it: SavedResult) => displayLabel(it, titleMap).toLowerCase();
+  const label = (it: SavedResult) => displayLabel(it, titleMap, fileGithubMap).toLowerCase();
   if (!snap || !tierHasBracketEvidence(snap, tier)) {
     return [...items].sort((a, b) => label(a).localeCompare(label(b), "zh-Hans-CN"));
   }
@@ -75,9 +85,10 @@ function buildByTier(
   rankings: SavedResult[],
   titleMap: Record<string, string>,
   snap: DuelBracketSnapshot | null,
-  fileAliases: Map<string, string[]>
+  fileAliases: Map<string, string[]>,
+  fileGithubMap: Record<string, string>
 ): Record<LetterTier, SavedResult[]> {
-  const merged = mergeByTitle(rankings, titleMap);
+  const merged = mergeByTitle(rankings, titleMap, fileGithubMap);
   const groups: Record<LetterTier, SavedResult[]> = {
     S: [],
     A: [],
@@ -91,7 +102,7 @@ function buildByTier(
     groups[tier].push(item);
   }
   for (const tier of TIER_ORDER) {
-    groups[tier] = sortWithinTier(groups[tier], tier, snap, titleMap, fileAliases);
+    groups[tier] = sortWithinTier(groups[tier], tier, snap, titleMap, fileAliases, fileGithubMap);
   }
   return groups;
 }
@@ -184,12 +195,12 @@ export interface BuildRankingMarkdownParams {
 export function buildRankingMarkdownExport(p: BuildRankingMarkdownParams): string {
   const { t, roundId, rankings, titleMap, fileGithubMap, ruleFilterOption, pageUrl, lang } = p;
   const allForAlias = p.allRankingsForAliases ?? rankings;
-  const fileAliases = buildFileNameAliasGroups(allForAlias, titleMap);
+  const fileAliases = buildFileNameAliasGroups(allForAlias, titleMap, fileGithubMap);
   const snap = loadDuelBracketSnapshot(roundId);
   const snapHasAnyArena = Boolean(
     snap && (["S", "A", "B"] as const).some((t) => tierHasBracketEvidence(snap, t))
   );
-  const byTier = buildByTier(rankings, titleMap, snap, fileAliases);
+  const byTier = buildByTier(rankings, titleMap, snap, fileAliases, fileGithubMap);
 
   const lines: string[] = [];
   lines.push(`# ${t("ranking.title")}`);
@@ -252,7 +263,7 @@ export function buildRankingMarkdownExport(p: BuildRankingMarkdownParams): strin
     lines.push("");
 
     list.forEach((item, i) => {
-      const title = displayLabel(item, titleMap);
+      const title = displayLabel(item, titleMap, fileGithubMap);
       const gh = resolveGithubUrl(item, fileGithubMap);
       lines.push(`### ${i + 1}. ${title}`);
       lines.push("");

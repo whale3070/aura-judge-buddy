@@ -17,6 +17,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useI18n } from "@/lib/i18n";
+import { rankingItemDisplayLabel } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import FiveDimRadarChart from "@/components/FiveDimRadarChart";
 import DuelMatchDetail from "@/components/DuelMatchDetail";
@@ -24,10 +25,14 @@ import { syncDuelBracketFromServer } from "@/lib/duelBracketRemote";
 
 const TIER_ORDER: LetterTier[] = ["S", "A", "B", "C", "D", "?"];
 
-function mergeByTitle(rankings: SavedResult[], titleMap: Record<string, string>): SavedResult[] {
+function mergeByTitle(
+  rankings: SavedResult[],
+  titleMap: Record<string, string>,
+  fileGithubMap: Record<string, string>
+): SavedResult[] {
   const map = new Map<string, SavedResult>();
   for (const item of rankings) {
-    const title = titleMap[item.file_name] || item.file_name;
+    const title = rankingItemDisplayLabel(item, titleMap, fileGithubMap);
     const existing = map.get(title);
     if (!existing || item.avg_score > existing.avg_score) map.set(title, item);
   }
@@ -41,8 +46,12 @@ function resolveGithubUrl(item: SavedResult, fileGithubMap: Record<string, strin
   return u;
 }
 
-function displayLabel(item: SavedResult, titleMap: Record<string, string>): string {
-  return titleMap[item.file_name] || item.file_name;
+function displayLabel(
+  item: SavedResult,
+  titleMap: Record<string, string>,
+  fileGithubMap: Record<string, string>
+): string {
+  return rankingItemDisplayLabel(item, titleMap, fileGithubMap);
 }
 
 /** 同档内：单循环存证按 AI 基础分 + PK 积分；淘汰赛存证按擂台名次；否则按展示名 */
@@ -51,9 +60,10 @@ function sortWithinTier(
   tier: LetterTier,
   snap: DuelBracketSnapshot | null,
   titleMap: Record<string, string>,
-  fileAliases: Map<string, string[]>
+  fileAliases: Map<string, string[]>,
+  fileGithubMap: Record<string, string>
 ): SavedResult[] {
-  const label = (it: SavedResult) => displayLabel(it, titleMap).toLowerCase();
+  const label = (it: SavedResult) => displayLabel(it, titleMap, fileGithubMap).toLowerCase();
   if (!snap || !tierHasBracketEvidence(snap, tier)) {
     return [...items].sort((a, b) => label(a).localeCompare(label(b), "zh-Hans-CN"));
   }
@@ -122,8 +132,8 @@ export default function RankingByTierPanel({
   );
 
   const fileAliases = useMemo(
-    () => buildFileNameAliasGroups(allRankingsForAliases, titleMap),
-    [allRankingsForAliases, titleMap]
+    () => buildFileNameAliasGroups(allRankingsForAliases, titleMap, fileGithubMap),
+    [allRankingsForAliases, titleMap, fileGithubMap]
   );
 
   const snapHasAnyArena = useMemo(() => {
@@ -132,7 +142,7 @@ export default function RankingByTierPanel({
   }, [snap]);
 
   const byTier = useMemo(() => {
-    const merged = mergeByTitle(rankings, titleMap);
+    const merged = mergeByTitle(rankings, titleMap, fileGithubMap);
     const groups: Record<LetterTier, SavedResult[]> = {
       S: [],
       A: [],
@@ -146,10 +156,10 @@ export default function RankingByTierPanel({
       groups[tier].push(item);
     }
     for (const tier of TIER_ORDER) {
-      groups[tier] = sortWithinTier(groups[tier], tier, snap, titleMap, fileAliases);
+      groups[tier] = sortWithinTier(groups[tier], tier, snap, titleMap, fileAliases, fileGithubMap);
     }
     return groups;
-  }, [rankings, titleMap, snap, fileAliases]);
+  }, [rankings, titleMap, snap, fileAliases, fileGithubMap]);
 
   const openDetail = (item: SavedResult) => {
     setSelected(item);
@@ -228,7 +238,7 @@ export default function RankingByTierPanel({
                   {snap && tierHasBracketEvidence(snap, tier) ? (
                     <ul className="space-y-1 pt-3">
                       {list.map((item, i) => {
-                        const displayTitle = displayLabel(item, titleMap);
+                        const displayTitle = displayLabel(item, titleMap, fileGithubMap);
                         const showFile = displayTitle !== item.file_name;
                         return (
                           <li key={item.file_name}>
@@ -263,7 +273,7 @@ export default function RankingByTierPanel({
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-3">
                       {list.map((item) => {
-                        const displayTitle = displayLabel(item, titleMap);
+                        const displayTitle = displayLabel(item, titleMap, fileGithubMap);
                         const showFile = displayTitle !== item.file_name;
                         return (
                           <button
@@ -304,14 +314,14 @@ export default function RankingByTierPanel({
               {selected && (
                 <>
                   <span className="block flex items-center gap-2">
-                    <span className="truncate">{displayLabel(selected, titleMap)}</span>
+                    <span className="truncate">{displayLabel(selected, titleMap, fileGithubMap)}</span>
                     {fileForkMap[selected.file_name] ? (
                       <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive border border-destructive/40 font-semibold">
                         Forked
                       </span>
                     ) : null}
                   </span>
-                  {displayLabel(selected, titleMap) !== selected.file_name ? (
+                  {displayLabel(selected, titleMap, fileGithubMap) !== selected.file_name ? (
                     <span className="block text-xs font-mono text-muted-foreground font-normal">
                       {selected.file_name}
                     </span>

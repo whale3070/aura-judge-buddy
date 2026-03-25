@@ -1,4 +1,5 @@
 import type { LetterTier } from "@/lib/dimensionTier";
+import { rankingItemDisplayLabel } from "@/lib/utils";
 
 export const DUEL_BRACKET_STORAGE_KEY = "aura_duel_bracket_snapshot_v1";
 
@@ -92,12 +93,13 @@ export function tierHasBracketEvidence(snap: DuelBracketSnapshot | null, tier: L
 
 /** 同展示名下多份存证（不同 rule_version）→ 多个 readme 文件名，用于对齐擂台 fileA/fileB */
 export function buildFileNameAliasGroups(
-  rankings: { file_name: string }[],
-  titleMap: Record<string, string>
+  rankings: { file_name: string; github_url?: string }[],
+  titleMap: Record<string, string>,
+  fileGithubMap: Record<string, string> = {}
 ): Map<string, string[]> {
   const byTitle = new Map<string, string[]>();
   for (const r of rankings) {
-    const title = (titleMap[r.file_name] || r.file_name).trim();
+    const title = rankingItemDisplayLabel(r, titleMap, fileGithubMap).trim();
     const list = byTitle.get(title) ?? [];
     list.push(r.file_name);
     byTitle.set(title, list);
