@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetchJudgeResult, type JudgeResult } from "@/lib/api";
 import { submitAuditAPI } from "@/lib/apiClient";
 import ReportCard from "@/components/ReportCard";
 import DocumentPanel from "@/components/DocumentPanel";
 import { useI18n } from "@/lib/i18n";
+import { formatPrimaryScoreLabel } from "@/lib/scoreNorm";
 
 interface Props {
   fileName: string;
@@ -12,9 +13,18 @@ interface Props {
   isForked?: boolean;
   onClose: () => void;
   onReauditDone?: () => void;
+  /** 裁决 JSON 已不存在（如提交已删）时回调：可刷新排名并收起详情 */
+  onResultMissing?: () => void;
 }
 
-export default function JudgeDetail({ fileName, roundId, isForked = false, onClose, onReauditDone }: Props) {
+export default function JudgeDetail({
+  fileName,
+  roundId,
+  isForked = false,
+  onClose,
+  onReauditDone,
+  onResultMissing,
+}: Props) {
   const { t } = useI18n();
   const [result, setResult] = useState<JudgeResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +36,8 @@ export default function JudgeDetail({ fileName, roundId, isForked = false, onClo
   const [outputLang, setOutputLang] = useState<"zh" | "en">("zh");
   const [customPrompt, setCustomPrompt] = useState("");
   const [lastRuleVersionID, setLastRuleVersionID] = useState("");
+  const onResultMissingRef = useRef(onResultMissing);
+  onResultMissingRef.current = onResultMissing;
 
   useEffect(() => {
     setLoading(true);
@@ -33,7 +45,13 @@ export default function JudgeDetail({ fileName, roundId, isForked = false, onClo
     setResult(null);
     fetchJudgeResult(fileName, roundId)
       .then(setResult)
-      .catch((e) => setError(e.message))
+      .catch((e) => {
+        const msg = String((e as Error)?.message ?? e);
+        setError(msg);
+        if (/not\s*found|judge result not found/i.test(msg)) {
+          onResultMissingRef.current?.();
+        }
+      })
       .finally(() => setLoading(false));
   }, [fileName, roundId]);
 
@@ -131,7 +149,12 @@ export default function JudgeDetail({ fileName, roundId, isForked = false, onClo
       {activeTab === "detail" && result && (
         <>
           <div className="flex gap-4 text-xs text-muted-foreground mb-3">
-            <span>{t("judgeDetail.overallScore")}<span className="text-primary font-bold">{result.avg_score.toFixed(1)}</span></span>
+            <span>
+              {t("judgeDetail.overallScore")}
+              <span className="text-primary font-bold">
+                {formatPrimaryScoreLabel(result.avg_score, result.rubric_raw_max)}
+              </span>
+            </span>
             <span>{t("judgeDetail.reviewTime")}{new Date(result.timestamp).toLocaleString()}</span>
           </div>
           <DocumentPanel fileName={result.file_name} roundId={roundId} />
@@ -139,6 +162,7 @@ export default function JudgeDetail({ fileName, roundId, isForked = false, onClo
             <ReportCard
               fileName={result.file_name}
               avgScore={result.avg_score}
+              rubricRawMax={result.rubric_raw_max}
               statusText="JUDGE_RESULT"
               reports={result.reports}
               defaultOpen={true}

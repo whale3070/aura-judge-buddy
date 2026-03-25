@@ -9,6 +9,7 @@ import DimensionScoreTable from "@/components/DimensionScoreTable";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatPrimaryScoreLabel, scoreNorm100 } from "@/lib/scoreNorm";
 
 export default function MySubmission() {
   const { t } = useI18n();
@@ -133,13 +134,21 @@ export default function MySubmission() {
             <ul className="space-y-3">
               {(submission.md_files ?? []).map((file) => {
                 const result = scores[file];
+                const normPct = result
+                  ? scoreNorm100(result.avg_score, result.rubric_raw_max)
+                  : 0;
                 return (
                   <li key={file} className="border border-border p-3 rounded">
                     <div className="flex justify-between items-center flex-wrap gap-2">
                       <span className="font-mono text-xs text-foreground/90">{file}</span>
                       {result ? (
-                        <span className={`font-bold ${result.avg_score >= 80 ? "text-primary" : result.avg_score < 60 ? "text-destructive" : "text-warning"}`}>
-                          {t("my.avgScore")} {result.avg_score.toFixed(1)}
+                        <span
+                          className={`font-bold ${
+                            normPct >= 80 ? "text-primary" : normPct < 60 ? "text-destructive" : "text-warning"
+                          }`}
+                        >
+                          {t("my.avgScore")}{" "}
+                          {formatPrimaryScoreLabel(result.avg_score, result.rubric_raw_max)}
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">{t("my.noScore")}</span>

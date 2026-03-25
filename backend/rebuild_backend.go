@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -79,6 +81,8 @@ type SubmissionSummary struct {
 	GithubOriginalityStatus  string   `json:"github_originality_status,omitempty"`
 	GithubOriginalityReasons []string `json:"github_originality_reasons,omitempty"`
 	GithubOriginalityScore   int      `json:"github_originality_score,omitempty"`
+	/** 与 form.track 一致，用于排行按赛道筛选 */
+	Track string `json:"track,omitempty"`
 }
 
 type AuditReport struct {
@@ -88,11 +92,15 @@ type AuditReport struct {
 	Error               string    `json:"error,omitempty"`
 	ScoreConflict       bool      `json:"score_conflict,omitempty"`
 	ScoreConflictValues []float64 `json:"score_conflict_values,omitempty"`
+	/** >0 表示 score 为「各维原始分之和」；与 YAML 加权满分之和一致 */
+	RubricRawMax float64 `json:"rubric_raw_max,omitempty"`
 }
 
 type SavedResult struct {
 	FileName               string        `json:"file_name"`
 	AvgScore               float64       `json:"avg_score"`
+	/** 各维满分之和（仅当 avg_score 为原始分总和时非零）；兼容旧存证缺省=0 表示 avg_score 为 0–100 归一 */
+	RubricRawMax           float64       `json:"rubric_raw_max,omitempty"`
 	LetterGrade            string        `json:"letter_grade,omitempty"`
 	Timestamp              string        `json:"timestamp"`
 	Reports                []AuditReport `json:"reports"`
@@ -120,15 +128,19 @@ type ruleMeta struct {
 type ruleSetYAML struct {
 	Name       string `yaml:"name"`
 	Version    string `yaml:"version"`
+	Notes      string `yaml:"notes"`
 	Dimensions []struct {
-		Key    string `yaml:"key"`
-		Name   string `yaml:"name"`
-		Weight int    `yaml:"weight"`
+		Key         string `yaml:"key"`
+		Name        string `yaml:"name"`
+		Weight      int    `yaml:"weight"`
+		Max         int    `yaml:"max"`
+		Description string `yaml:"description"`
 	} `yaml:"dimensions"`
 	GradingBands []struct {
 		Grade string `yaml:"grade"`
 		Min   int    `yaml:"min"`
 		Max   int    `yaml:"max"`
+		Label string `yaml:"label"`
 	} `yaml:"gradingBands"`
 }
 
@@ -200,8 +212,12 @@ func submissionSummaryFromMeta(metaPath, subID, roundID string, _ bool) (Submiss
 	if rec.RoundID == "" {
 		rec.RoundID = roundID
 	}
+	// 成功 enriched 后须返回年限（含 0，新账号），否则前端会把「有 username、无数值」误判为「获取中」。
 	var years *float64
-	if rec.GithubAccountYears > 0 {
+	if strings.EqualFold(strings.TrimSpace(rec.GithubEnrichStatus), "success") {
+		v := rec.GithubAccountYears
+		years = &v
+	} else if rec.GithubAccountYears > 0 {
 		v := rec.GithubAccountYears
 		years = &v
 	}
@@ -225,6 +241,7 @@ func submissionSummaryFromMeta(metaPath, subID, roundID string, _ bool) (Submiss
 		GithubOriginalityStatus:  rec.GithubOriginalityStatus,
 		GithubOriginalityReasons: rec.GithubOriginalityReasons,
 		GithubOriginalityScore:   rec.GithubOriginalityScore,
+		Track:                    strings.TrimSpace(rec.Form.Track),
 	}, nil
 }
 
@@ -508,6 +525,14 @@ func writeResult(roundID string, res *SavedResult) error {
 	return writeJSONFile(p, res)
 }
 
+// rankingSortKey 用于排序：原始分模式按 (avg/max)*100，与 legacy 0–100 分数可比。
+func rankingSortKey(s SavedResult) float64 {
+	if s.RubricRawMax > 0 {
+		return s.AvgScore / s.RubricRawMax * 100
+	}
+	return s.AvgScore
+}
+
 func loadRanking(roundID string) ([]SavedResult, error) {
 	entries, err := os.ReadDir(resultDirFor(roundID))
 	if err != nil {
@@ -526,7 +551,7 @@ func loadRanking(roundID string) ([]SavedResult, error) {
 			out = append(out, r)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].AvgScore > out[j].AvgScore })
+	sort.Slice(out, func(i, j int) bool { return rankingSortKey(out[i]) > rankingSortKey(out[j]) })
 	return out, nil
 }
 
@@ -554,7 +579,7 @@ func postAudit(c *gin.Context) {
 	}
 	models := body.SelectedModels
 	if len(models) == 0 {
-		models = []string{"deepseek", "doubao"}
+		models = []string{"deepseek"}
 	}
 	docPath, err := resolveWordDocumentPath(roundID, fileName)
 	if err != nil {
@@ -568,12 +593,11 @@ func postAudit(c *gin.Context) {
 	}
 	activeYAML, ruleID, _ := loadEffectiveRuleYAMLForRound(roundID)
 	reports := make([]AuditReport, 0, len(models))
-	total := 0.0
 	okCount := 0
 	anyScoreConflict := false
 	var failReasons []string
 	for _, m := range models {
-		content, score, conflict, conflictValues, llmErr := runSingleModelAudit(strings.TrimSpace(strings.ToLower(m)), body.OutputLang, body.CustomPrompt, fileName, string(doc), activeYAML)
+		content, score, rMax, conflict, conflictValues, llmErr := runSingleModelAudit(strings.TrimSpace(strings.ToLower(m)), body.OutputLang, body.CustomPrompt, fileName, string(doc), activeYAML)
 		rep := AuditReport{ModelName: m}
 		if llmErr != nil {
 			rep.Error = normalizeLLMErr(llmErr)
@@ -584,12 +608,12 @@ func postAudit(c *gin.Context) {
 		}
 		rep.Content = content
 		rep.Score = score
+		rep.RubricRawMax = rMax
 		rep.ScoreConflict = conflict
 		rep.ScoreConflictValues = conflictValues
 		if conflict {
 			anyScoreConflict = true
 		}
-		total += score
 		okCount++
 		reports = append(reports, rep)
 	}
@@ -604,17 +628,18 @@ func postAudit(c *gin.Context) {
 		})
 		return
 	}
-	avg := total / float64(okCount)
+	avg, rawMax, letter := aggregateSavedResultScores(reports, activeYAML)
 	res := &SavedResult{
-		FileName:   fileName,
-		AvgScore:   avg,
-		LetterGrade: gradeFromBands(avg, activeYAML),
-		Timestamp:  time.Now().UTC().Format(time.RFC3339),
-		Reports:    reports,
-		RoundID:    roundID,
-		RuleVersionID: ruleID,
-		RuleSHA256:    currentRuleSHA(roundID),
-		ScoreConflict: anyScoreConflict,
+		FileName:        fileName,
+		AvgScore:        avg,
+		RubricRawMax:    rawMax,
+		LetterGrade:     letter,
+		Timestamp:       time.Now().UTC().Format(time.RFC3339),
+		Reports:         reports,
+		RoundID:         roundID,
+		RuleVersionID:   ruleID,
+		RuleSHA256:      currentRuleSHA(roundID),
+		ScoreConflict:   anyScoreConflict,
 	}
 	if err := writeResult(roundID, res); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -623,14 +648,85 @@ func postAudit(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+// resolveRankingTrackQuery 解析 ?track=：优先匹配本场 .aura_tracks.json 中的 id，并兼容旧版 normalizeTrackID 别名。
+func resolveRankingTrackQuery(roundID, raw string) (filter string, err error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || strings.EqualFold(raw, "all") {
+		return "", nil
+	}
+	if id, e := sanitizeRoundTrackID(raw); e == nil && validRoundTrackID(roundID, id) {
+		return id, nil
+	}
+	if leg := normalizeTrackID(raw); leg != "" {
+		return leg, nil
+	}
+	if id, e := sanitizeRoundTrackID(raw); e == nil && !RoundHasConfiguredTracks(roundID) {
+		return id, nil
+	}
+	return "", errors.New("invalid track")
+}
+
+func rankingRowResolvedTrackID(row *SavedResult, roundID string) string {
+	subID := parseSubmissionIDFromStandardReadmeWordFile(row.FileName)
+	if !submissionFolderIDOK(subID) {
+		return ""
+	}
+	metaPath := filepath.Join(submissionRoundDirFor(roundID), subID, "submission.json")
+	var rec SubmissionRecord
+	if err := readJSONFile(metaPath, &rec); err != nil {
+		return ""
+	}
+	return detectSubmissionTrack(&rec, roundID, subID)
+}
+
+// attachRankingCountsToTracks 为每个已配置赛道填充 ranking_count（与 /api/ranking?track= 条数一致）。
+func attachRankingCountsToTracks(roundID string, tracks []RoundTrackEntry) []RoundTrackEntry {
+	counts := make(map[string]int)
+	cleanIDs := make([]string, 0, len(tracks))
+	for _, t := range tracks {
+		if id, err := sanitizeRoundTrackID(t.ID); err == nil {
+			if _, ok := counts[id]; !ok {
+				counts[id] = 0
+				cleanIDs = append(cleanIDs, id)
+			}
+		}
+	}
+	if len(cleanIDs) > 0 {
+		if rows, err := loadRanking(roundID); err == nil {
+			for i := range rows {
+				tk := rankingRowResolvedTrackID(&rows[i], roundID)
+				if tk != "" {
+					if _, ok := counts[tk]; ok {
+						counts[tk]++
+					}
+				}
+			}
+		}
+	}
+	out := make([]RoundTrackEntry, 0, len(tracks))
+	for _, t := range tracks {
+		entry := RoundTrackEntry{
+			ID:          t.ID,
+			Name:        t.Name,
+			Description: t.Description,
+			PrizePool:   t.PrizePool,
+		}
+		if id, err := sanitizeRoundTrackID(t.ID); err == nil {
+			entry.RankingCount = counts[id]
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
 func getRanking(c *gin.Context) {
 	roundID, err := sanitizeRoundIDOrDefault(c.Query("round_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid round_id"})
 		return
 	}
-	trackFilter := normalizeTrackID(c.Query("track"))
-	if strings.TrimSpace(c.Query("track")) != "" && trackFilter == "" {
+	trackFilter, err := resolveRankingTrackQuery(roundID, c.Query("track"))
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid track"})
 		return
 	}
@@ -645,7 +741,11 @@ func getRanking(c *gin.Context) {
 	filtered := make([]SavedResult, 0, len(rows))
 	for i := range rows {
 		if strings.TrimSpace(rows[i].LetterGrade) == "" {
-			rows[i].LetterGrade = gradeFromBands(rows[i].AvgScore, activeYAML)
+			norm := rows[i].AvgScore
+			if rows[i].RubricRawMax > 0 {
+				norm = rows[i].AvgScore / rows[i].RubricRawMax * 100
+			}
+			rows[i].LetterGrade = gradeFromBands(norm, activeYAML)
 		}
 		subID := parseSubmissionIDFromStandardReadmeWordFile(rows[i].FileName)
 		if !submissionFolderIDOK(subID) {
@@ -679,8 +779,10 @@ func getRanking(c *gin.Context) {
 		switch target {
 		case "D":
 			rows[i].AvgScore = 45
+			rows[i].RubricRawMax = 0
 			rows[i].LetterGrade = "D"
 		case "C":
+			rows[i].RubricRawMax = 0
 			rows[i].AvgScore = 65
 			rows[i].LetterGrade = "C"
 		}
@@ -689,7 +791,7 @@ func getRanking(c *gin.Context) {
 		}
 		filtered = append(filtered, rows[i])
 	}
-	sort.Slice(filtered, func(i, j int) bool { return filtered[i].AvgScore > filtered[j].AvgScore })
+	sort.Slice(filtered, func(i, j int) bool { return rankingSortKey(filtered[i]) > rankingSortKey(filtered[j]) })
 	c.JSON(http.StatusOK, filtered)
 }
 
@@ -708,10 +810,18 @@ func normalizeTrackID(raw string) string {
 }
 
 func detectSubmissionTrack(rec *SubmissionRecord, roundID, subID string) string {
+	configured := RoundHasConfiguredTracks(roundID)
 	if rec != nil {
-		t := normalizeTrackID(rec.Form.Track)
-		if t != "" {
-			return t
+		raw := strings.TrimSpace(rec.Form.Track)
+		if raw != "" {
+			if id, err := sanitizeRoundTrackID(raw); err == nil {
+				if !configured || validRoundTrackID(roundID, id) {
+					return id
+				}
+			}
+			if t := normalizeTrackID(raw); t != "" {
+				return t
+			}
 		}
 		text := strings.ToLower(strings.Join([]string{
 			rec.Form.ProjectTitle,
@@ -739,6 +849,9 @@ func detectSubmissionTrack(rec *SubmissionRecord, roundID, subID string) string 
 				return "user_facing"
 			}
 		}
+	}
+	if configured {
+		return ""
 	}
 	return "agent_infra"
 }
@@ -794,6 +907,50 @@ func getFiles(c *gin.Context) {
 	}
 	sort.Strings(files)
 	c.JSON(http.StatusOK, files)
+}
+
+// getFileContent GET /api/file-content?file=...&round_id=... — 预览/下载 word 目录下的待审文件（与 /api/audit 解析路径一致）。
+func getFileContent(c *gin.Context) {
+	roundID, err := sanitizeRoundIDOrDefault(c.Query("round_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid round_id"})
+		return
+	}
+	fileName := strings.TrimSpace(c.Query("file"))
+	if fileName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file required"})
+		return
+	}
+	path, err := resolveWordDocumentPath(roundID, fileName)
+	if err != nil || path == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+	base := filepath.Base(path)
+	ext := strings.ToLower(filepath.Ext(base))
+	var ctype string
+	switch ext {
+	case ".md", ".markdown":
+		ctype = "text/markdown; charset=utf-8"
+	case ".txt":
+		ctype = "text/plain; charset=utf-8"
+	case ".pdf":
+		ctype = "application/pdf"
+	default:
+		ctype = "application/octet-stream"
+	}
+	download := strings.TrimSpace(c.Query("download"))
+	if download == "1" || strings.EqualFold(download, "true") {
+		c.Header("Content-Disposition", `attachment; filename="`+base+`"`)
+	} else {
+		c.Header("Content-Disposition", `inline; filename="`+base+`"`)
+	}
+	c.Data(http.StatusOK, ctype, data)
 }
 
 func getSubmissions(c *gin.Context) {
@@ -874,6 +1031,55 @@ func getSubmissionByID(c *gin.Context) {
 	c.JSON(http.StatusOK, sum)
 }
 
+type putSubmissionTrackBody struct {
+	Track string `json:"track"`
+}
+
+// putSubmissionTrack PUT /api/submission/:id/track?round_id= — 写入 submission.json form.track（须为本场已配置赛道 id，或传空字符串清空）
+func putSubmissionTrackHTTP(c *gin.Context) {
+	subID := strings.TrimSpace(c.Param("id"))
+	if !submissionFolderIDOK(subID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid submission id"})
+		return
+	}
+	roundID, err := sanitizeRoundIDOrDefault(c.Query("round_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid round_id"})
+		return
+	}
+	metaPath := filepath.Join(submissionRoundDirFor(roundID), subID, "submission.json")
+	var rec SubmissionRecord
+	if err := readJSONFile(metaPath, &rec); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "submission not found"})
+		return
+	}
+	var body putSubmissionTrackBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+		return
+	}
+	raw := strings.TrimSpace(body.Track)
+	if raw == "" {
+		rec.Form.Track = ""
+	} else {
+		tid, err := sanitizeRoundTrackID(raw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid track id"})
+			return
+		}
+		if RoundHasConfiguredTracks(roundID) && !validRoundTrackID(roundID, tid) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown track for this round"})
+			return
+		}
+		rec.Form.Track = tid
+	}
+	if err := writeJSONFile(metaPath, &rec); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "save failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"track": strings.TrimSpace(rec.Form.Track)})
+}
+
 func deleteSubmission(c *gin.Context) {
 	subID := strings.TrimSpace(c.Param("id"))
 	if !submissionFolderIDOK(subID) {
@@ -951,39 +1157,30 @@ func newOpenAIJudgeClient(model string) (*openai.Client, string, error) {
 	}
 }
 
-func extractScoreFromContent(content string) float64 {
-	// Prefer explicit AI_SCORE / TOTAL_SCORE lines (accept markdown wrappers like **AI_SCORE: 85**).
-	explicit := regexp.MustCompile(`(?im)(?:AI_SCORE|TOTAL_SCORE|FINAL_SCORE)\s*[:：]\s*([0-9]{1,3}(?:\.[0-9]+)?)`)
-	if m := explicit.FindStringSubmatch(content); len(m) >= 2 {
-		if v, err := strconv.ParseFloat(m[1], 64); err == nil {
-			if v < 0 {
-				return 0
-			}
-			if v > 100 {
-				return 100
-			}
-			return v
-		}
+func yamlDimensionMax(maxField int) int {
+	if maxField > 0 {
+		return maxField
 	}
-	dim := regexp.MustCompile(`(?im)(创新性|技术实现|商业价值|用户体验|落地可行性)\s*[:：]\s*([0-9]{1,2}(?:\.[0-9]+)?)`)
-	all := dim.FindAllStringSubmatch(content, -1)
-	if len(all) > 0 {
-		sum := 0.0
-		for _, it := range all {
-			v, _ := strconv.ParseFloat(it[2], 64)
-			sum += v
-		}
-		avg20 := sum / float64(len(all))
-		return (avg20 / 20.0) * 100.0
-	}
-	return 70.0
+	return 20
 }
 
-func parseDimensionScores(content string) map[string]float64 {
+func parseRuleSetYAMLString(raw string) *ruleSetYAML {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var rs ruleSetYAML
+	if err := yaml.Unmarshal([]byte(raw), &rs); err != nil {
+		return nil
+	}
+	if len(rs.Dimensions) == 0 {
+		return nil
+	}
+	return &rs
+}
+
+func parseLegacyChineseFiveDims(content string) map[string]float64 {
 	out := map[string]float64{}
-	// Support both:
-	// - 创新性: 18
-	// - 创新性 ... 18/20
 	re := regexp.MustCompile(`(?im)(创新性|技术实现|商业价值|用户体验|落地可行性)[^\n\r]*?([0-9]{1,2}(?:\.[0-9]+)?)\s*(?:/20)?`)
 	for _, m := range re.FindAllStringSubmatch(content, -1) {
 		if len(m) < 3 {
@@ -1004,12 +1201,196 @@ func parseDimensionScores(content string) map[string]float64 {
 	return out
 }
 
-func scoreByRuleWeights(dim map[string]float64, activeYAML string) float64 {
+// extractRubricScoresSection returns text between RUBRIC_SCORES_BLOCK and END_RUBRIC_SCORES_BLOCK if present.
+func extractRubricScoresSection(content string) (string, bool) {
+	reStart := regexp.MustCompile(`(?is)RUBRIC_SCORES_BLOCK\s*\n`)
+	reEnd := regexp.MustCompile(`(?is)\n\s*END_RUBRIC_SCORES_BLOCK`)
+	loc := reStart.FindStringIndex(content)
+	if loc == nil {
+		return "", false
+	}
+	tail := content[loc[1]:]
+	loc2 := reEnd.FindStringIndex(tail)
+	if loc2 == nil {
+		return "", false
+	}
+	return tail[:loc2[0]], true
+}
+
+func parseDimensionScoresFromContent(content string, rs *ruleSetYAML) map[string]float64 {
+	if rs == nil || len(rs.Dimensions) == 0 {
+		return parseLegacyChineseFiveDims(content)
+	}
+	searchPrimary := content
+	if sec, ok := extractRubricScoresSection(content); ok && strings.TrimSpace(sec) != "" {
+		searchPrimary = sec
+	}
+	out := map[string]float64{}
+	for _, d := range rs.Dimensions {
+		name := strings.TrimSpace(d.Name)
+		if name == "" {
+			continue
+		}
+		maxV := yamlDimensionMax(d.Max)
+		esc := regexp.QuoteMeta(name)
+		pat := fmt.Sprintf(`(?im)^\s*(?:\*\*)?%s(?:\*\*)?\s*[:：]\s*([0-9]{1,2}(?:\.[0-9]+)?)\s*(?:/\s*%d)?\s*$`, esc, maxV)
+		reLine, err := regexp.Compile(pat)
+		if err != nil {
+			continue
+		}
+		patLoose := fmt.Sprintf(`(?i)(?:\*\*)?%s(?:\*\*)?\s*[:：]\s*([0-9]{1,2}(?:\.[0-9]+)?)\s*(?:/\s*%d)?`, esc, maxV)
+		reLoose, err := regexp.Compile(patLoose)
+		if err != nil {
+			continue
+		}
+		tryExtract := func(src string) (float64, bool) {
+			for _, line := range strings.Split(src, "\n") {
+				if m := reLine.FindStringSubmatch(strings.TrimSpace(line)); len(m) >= 2 {
+					v, err := strconv.ParseFloat(m[1], 64)
+					if err != nil {
+						continue
+					}
+					return v, true
+				}
+			}
+			all := reLoose.FindAllStringSubmatch(src, -1)
+			if len(all) == 0 {
+				return 0, false
+			}
+			m := all[len(all)-1]
+			if len(m) < 2 {
+				return 0, false
+			}
+			v, err := strconv.ParseFloat(m[1], 64)
+			if err != nil {
+				return 0, false
+			}
+			return v, true
+		}
+		v, ok := tryExtract(searchPrimary)
+		if !ok && searchPrimary != content {
+			v, ok = tryExtract(content)
+		}
+		if !ok {
+			continue
+		}
+		mv := float64(maxV)
+		if v < 0 {
+			v = 0
+		}
+		if v > mv {
+			v = mv
+		}
+		out[name] = v
+	}
+	return out
+}
+
+func allWeightedRuleDimsPresent(dim map[string]float64, rs *ruleSetYAML) bool {
+	if rs == nil || len(dim) == 0 {
+		return false
+	}
+	for _, d := range rs.Dimensions {
+		if d.Weight <= 0 {
+			continue
+		}
+		if _, ok := dim[strings.TrimSpace(d.Name)]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func rubricPossibleRawMax(rs *ruleSetYAML) float64 {
+	if rs == nil {
+		return 0
+	}
+	var s float64
+	for _, d := range rs.Dimensions {
+		if d.Weight <= 0 {
+			continue
+		}
+		s += float64(yamlDimensionMax(d.Max))
+	}
+	return s
+}
+
+func rubricRawSum(dim map[string]float64, rs *ruleSetYAML) float64 {
+	if rs == nil {
+		return 0
+	}
+	var sum float64
+	for _, d := range rs.Dimensions {
+		if d.Weight <= 0 {
+			continue
+		}
+		name := strings.TrimSpace(d.Name)
+		if v, ok := dim[name]; ok {
+			sum += v
+		}
+	}
+	return sum
+}
+
+// computeAuditScoreBundle: 若解析齐 YAML 带权维度，reportScore=各维分数之和，rubricRawMax=满分之和，normForGrade=(和/满分)*100；否则与旧版一致 reportScore 为 0–100。
+func computeAuditScoreBundle(content string, rs *ruleSetYAML) (reportScore float64, rubricRawMax float64, normForGrade float64) {
+	dim := parseDimensionScoresFromContent(content, rs)
+	maxSum := rubricPossibleRawMax(rs)
+	if rs != nil && maxSum > 0 && allWeightedRuleDimsPresent(dim, rs) {
+		raw := rubricRawSum(dim, rs)
+		norm := raw / maxSum * 100
+		if norm > 100 {
+			norm = 100
+		}
+		return raw, maxSum, norm
+	}
+	fallback := extractScoreFromContentPartial(content, rs, dim)
+	return fallback, 0, fallback
+}
+
+func clampScore100(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
+}
+
+// extractScoreFromContent 返回 0–100 归一（用于兼容旧逻辑）；完整 YAML 维度解析时与 scoreByRuleWeights 一致。
+func extractScoreFromContent(content string, rs *ruleSetYAML) float64 {
+	_, _, n := computeAuditScoreBundle(content, rs)
+	return n
+}
+
+func extractScoreFromContentPartial(content string, rs *ruleSetYAML, dim map[string]float64) float64 {
+	explicit := regexp.MustCompile(`(?im)(?:AI_SCORE|TOTAL_SCORE|FINAL_SCORE)\s*[:：]\s*([0-9]{1,3}(?:\.[0-9]+)?)`)
+	if m := explicit.FindStringSubmatch(content); len(m) >= 2 {
+		if v, err := strconv.ParseFloat(m[1], 64); err == nil {
+			return clampScore100(v)
+		}
+	}
+	if s := scoreByRuleWeights(dim, rs); s > 0 {
+		return clampScore100(s)
+	}
+	all := parseLegacyChineseFiveDims(content)
+	if len(all) > 0 {
+		sum := 0.0
+		for _, v := range all {
+			sum += v
+		}
+		avg20 := sum / float64(len(all))
+		return clampScore100((avg20 / 20.0) * 100.0)
+	}
+	return 70.0
+}
+
+func scoreByRuleWeights(dim map[string]float64, rs *ruleSetYAML) float64 {
 	if len(dim) == 0 {
 		return 0
 	}
-	rs := ruleSetYAML{}
-	if strings.TrimSpace(activeYAML) != "" && yaml.Unmarshal([]byte(activeYAML), &rs) == nil && len(rs.Dimensions) > 0 {
+	if rs != nil && len(rs.Dimensions) > 0 {
 		totalWeight := 0
 		total := 0.0
 		for _, d := range rs.Dimensions {
@@ -1022,14 +1403,14 @@ func scoreByRuleWeights(dim map[string]float64, activeYAML string) float64 {
 			if !ok {
 				continue
 			}
+			maxV := float64(yamlDimensionMax(d.Max))
 			totalWeight += w
-			total += (v / 20.0 * 100.0) * float64(w)
+			total += (v / maxV * 100.0) * float64(w)
 		}
 		if totalWeight > 0 {
 			return total / float64(totalWeight)
 		}
 	}
-	// fallback: equal-weight 5 dims
 	keys := []string{"创新性", "技术实现", "商业价值", "用户体验", "落地可行性"}
 	sum := 0.0
 	cnt := 0
@@ -1043,6 +1424,72 @@ func scoreByRuleWeights(dim map[string]float64, activeYAML string) float64 {
 		return 0
 	}
 	return (sum / float64(cnt) / 20.0) * 100.0
+}
+
+func buildAuditInstructionBlock(rs *ruleSetYAML, customPrompt string) string {
+	prefix := strings.TrimSpace(customPrompt)
+	if prefix == "" {
+		prefix = "Apply ACTIVE_RULES_YAML fairly: use exact YAML dimension names, per-dimension max scores, weights, gradingBands, and notes."
+	}
+	if rs != nil && len(rs.Dimensions) > 0 {
+		var b strings.Builder
+		b.WriteString(prefix)
+		b.WriteString("\n\n")
+		b.WriteString("Scoring calibration (mandatory):\n")
+		b.WriteString("- Base scores ONLY on evidence in [DOCUMENT]. Do not invent features; ambiguous gaps should moderate scores on that criterion, not collapse every criterion.\n")
+		b.WriteString("- Use the full 0–max range meaningfully: a workable hackathon MVP with clear gaps is often near the **mid range** on criteria that are partially satisfied. Reserve **very low scores** for that criterion only when it is clearly unmet, misleading, or critically failed **for that criterion**.\n")
+		b.WriteString("- Score each dimension **independently**: a shortcoming in one rubric line must not automatically force **unrelated** dimensions to the minimum.\n")
+		b.WriteString("- When a criterion mentions \"Polkadot / Web3\" or similar: **other major Web3 chains and tooling still count as Web3-relevant**. Penalize lack of Polkadot/Substrate-specific fit **in proportion** to how strongly the criterion and project scope emphasize Polkadot; **do not assign the minimum ecosystem score solely because the stack is not Polkadot** unless the materials require Polkadot-native delivery.\n\n")
+		b.WriteString("Output order (mandatory):\n")
+		b.WriteString("1) FIRST emit the machine-readable block below (one line per rubric dimension, names must match YAML `name` **exactly**, integer 0–max only):\n")
+		b.WriteString("RUBRIC_SCORES_BLOCK\n")
+		b.WriteString("<exact YAML name>: <integer>\n")
+		b.WriteString("... (repeat for every weighted dimension)\n")
+		b.WriteString("END_RUBRIC_SCORES_BLOCK\n\n")
+		b.WriteString("2) THEN add brief rationale per dimension (you may repeat the dimension names).\n")
+		b.WriteString("3) End the entire response with exactly one line: AI_SCORE: <sum of dimension scores> (integer or one decimal), NOT the 0–100 normalized value.\n\n")
+		b.WriteString("Rubric dimensions:\n")
+		for _, d := range rs.Dimensions {
+			maxV := yamlDimensionMax(d.Max)
+			desc := strings.TrimSpace(d.Description)
+			if nl := strings.Index(desc, "\n"); nl >= 0 {
+				desc = strings.TrimSpace(desc[:nl])
+			}
+			if desc != "" {
+				fmt.Fprintf(&b, "- %s — 0–%d, weight %d%% — %s\n", strings.TrimSpace(d.Name), maxV, d.Weight, desc)
+			} else {
+				fmt.Fprintf(&b, "- %s — 0–%d, weight %d%%\n", strings.TrimSpace(d.Name), maxV, d.Weight)
+			}
+		}
+		rsMax := rubricPossibleRawMax(rs)
+		fmt.Fprintf(&b, "\nGrading note: dimension lines above are each 0–max; **AI_SCORE** must be their **numeric sum** (max %.0f). The server converts sum/max to 0–100 only for gradingBands.\n", rsMax)
+		if len(rs.GradingBands) > 0 {
+			b.WriteString("\ngradingBands (weighted total 0–100; reference only; letter tier for ranking may follow `notes` ladder if specified there):\n")
+			for _, g := range rs.GradingBands {
+				lab := strings.TrimSpace(g.Label)
+				if lab != "" {
+					fmt.Fprintf(&b, "  %s: %d–%d — %s\n", strings.ToUpper(strings.TrimSpace(g.Grade)), g.Min, g.Max, lab)
+				} else {
+					fmt.Fprintf(&b, "  %s: %d–%d\n", strings.ToUpper(strings.TrimSpace(g.Grade)), g.Min, g.Max)
+				}
+			}
+		}
+		if notes := strings.TrimSpace(rs.Notes); notes != "" {
+			b.WriteString("\n--- Ruleset notes (normative for output format, ladders, and conventions) ---\n")
+			b.WriteString(notes)
+			b.WriteString("\n")
+		}
+		return b.String()
+	}
+	legacy := `(Legacy rubric — use only when YAML has no dimensions.) Score these five dimensions 0–20 each with brief rationale:
+- 创新性
+- 技术实现
+- 商业价值
+- 用户体验
+- 落地可行性
+
+End with: AI_SCORE: <0-100> (weighted average of the five scores scaled to 0–100).`
+	return prefix + "\n\n" + legacy
 }
 
 func gradeFromBands(score float64, activeYAML string) string {
@@ -1079,12 +1526,9 @@ func ensureAuditFooter(content string, score float64) string {
 	return c
 }
 
-func detectAIScoreConflict(content string) (bool, []float64) {
+func detectAIScoreConflict(content string, expectedReportScore float64) (bool, []float64) {
 	re := regexp.MustCompile(`(?im)AI_SCORE\s*[:：]\s*([0-9]{1,3}(?:\.[0-9]+)?)`)
 	all := re.FindAllStringSubmatch(content, -1)
-	if len(all) <= 1 {
-		return false, nil
-	}
 	seen := map[string]bool{}
 	values := make([]float64, 0, len(all))
 	for _, m := range all {
@@ -1098,10 +1542,7 @@ func detectAIScoreConflict(content string) (bool, []float64) {
 		if v < 0 {
 			v = 0
 		}
-		if v > 100 {
-			v = 100
-		}
-		k := fmt.Sprintf("%.2f", v)
+		k := fmt.Sprintf("%.4f", v)
 		if seen[k] {
 			continue
 		}
@@ -1109,80 +1550,262 @@ func detectAIScoreConflict(content string) (bool, []float64) {
 		values = append(values, v)
 	}
 	sort.Float64s(values)
-	return len(values) > 1, values
+	if len(values) > 1 {
+		return true, values
+	}
+	if len(values) == 1 && math.Abs(values[0]-expectedReportScore) > 0.05 {
+		return true, []float64{values[0], expectedReportScore}
+	}
+	return false, nil
 }
 
-func runSingleModelAudit(model, outputLang, customPrompt, fileName, doc, activeYAML string) (string, float64, bool, []float64, error) {
+func runSingleModelAudit(model, outputLang, customPrompt, fileName, doc, activeYAML string) (string, float64, float64, bool, []float64, error) {
 	client, modelID, err := newOpenAIJudgeClient(model)
 	if err != nil {
-		return "", 0, false, nil, err
+		return "", 0, 0, false, nil, err
 	}
 	if outputLang == "" {
 		outputLang = "en"
-	}
-	if customPrompt == "" {
-		customPrompt = "Score strictly based on ACTIVE_RULES_YAML if provided."
 	}
 	langDirective := "Write in English."
 	if strings.ToLower(strings.TrimSpace(outputLang)) == "zh" {
 		langDirective = "全文使用中文输出。"
 	}
+	rs := parseRuleSetYAMLString(activeYAML)
+	instruction := buildAuditInstructionBlock(rs, customPrompt)
 	userPrompt := fmt.Sprintf(
-		"[LANGUAGE]\n%s\n[/LANGUAGE]\n\n[ACTIVE_RULES_YAML]\n%s\n[/ACTIVE_RULES_YAML]\n\n[TARGET_FILE]\n%s\n[/TARGET_FILE]\n\n[DOCUMENT]\n%s\n[/DOCUMENT]\n\n[INSTRUCTION]\n%s\n\n必须按以下五维分别给出 0-20 分并解释：\n- 创新性\n- 技术实现\n- 商业价值\n- 用户体验\n- 落地可行性\n\n最后输出：\n1) Weighted Total Score (0-100)\n2) AI_SCORE: <0-100 number>\n[/INSTRUCTION]",
-		langDirective, activeYAML, fileName, doc, customPrompt,
+		"[LANGUAGE]\n%s\n[/LANGUAGE]\n\n[ACTIVE_RULES_YAML]\n%s\n[/ACTIVE_RULES_YAML]\n\n[TARGET_FILE]\n%s\n[/TARGET_FILE]\n\n[DOCUMENT]\n%s\n[/DOCUMENT]\n\n[INSTRUCTION]\n%s\n[/INSTRUCTION]",
+		langDirective, activeYAML, fileName, doc, instruction,
 	)
 	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
 		Model: modelID,
 		Messages: []openai.ChatCompletionMessage{
-			{Role: openai.ChatMessageRoleSystem, Content: "You are a strict hackathon judge."},
+			{Role: openai.ChatMessageRoleSystem, Content: "You are an experienced hackathon judge. Apply ACTIVE_RULES_YAML calmly and proportionally: score from stated evidence, keep dimensions independent unless the rubric explicitly ties them, and avoid universally harsh anchoring."},
 			{Role: openai.ChatMessageRoleUser, Content: userPrompt},
 		},
 		Temperature: 0.2,
 	})
 	if err != nil {
-		return "", 0, false, nil, err
+		return "", 0, 0, false, nil, err
 	}
 	content := strings.TrimSpace(resp.Choices[0].Message.Content)
-	dim := parseDimensionScores(content)
-	score := scoreByRuleWeights(dim, activeYAML)
-	if score <= 0 {
-		score = extractScoreFromContent(content)
-	}
-	if score < 0 {
-		score = 0
-	}
-	if score > 100 {
-		score = 100
-	}
-	conflict, conflictValues := detectAIScoreConflict(content)
-	content = ensureAuditFooter(content, score)
-	return content, score, conflict, conflictValues, nil
+	reportScore, rubricRawMax, _ := computeAuditScoreBundle(content, rs)
+	conflict, conflictValues := detectAIScoreConflict(content, reportScore)
+	content = ensureAuditFooter(content, reportScore)
+	return content, reportScore, rubricRawMax, conflict, conflictValues, nil
 }
 
-func processGithubRepoAndAudit(roundID, submissionID, githubURL string, skipLLM bool) error {
+func aggregateSavedResultScores(reports []AuditReport, activeYAML string) (avgScore float64, rubricRawMax float64, letterGrade string) {
+	var sum float64
+	n := 0
+	allRaw := true
+	var maxR float64
+	for _, r := range reports {
+		if strings.TrimSpace(r.Error) != "" {
+			continue
+		}
+		sum += r.Score
+		n++
+		if r.RubricRawMax <= 0 {
+			allRaw = false
+		} else if maxR == 0 {
+			maxR = r.RubricRawMax
+		} else if math.Abs(r.RubricRawMax-maxR) > 0.01 {
+			allRaw = false
+		}
+	}
+	if n == 0 {
+		return 0, 0, ""
+	}
+	avgScore = sum / float64(n)
+	if allRaw && maxR > 0 {
+		rubricRawMax = maxR
+		letterGrade = gradeFromBands(avgScore/maxR*100, activeYAML)
+	} else {
+		letterGrade = gradeFromBands(avgScore, activeYAML)
+	}
+	return avgScore, rubricRawMax, letterGrade
+}
+
+const placeholderReadmeMarker = "This is a rebuilt-backend placeholder README snapshot"
+
+func isPlaceholderReadmeMarkdown(s string) bool {
+	s = strings.TrimSpace(s)
+	return s == "" || strings.Contains(s, placeholderReadmeMarker)
+}
+
+func loadSubmissionRecordForAudit(roundID, submissionID string) *SubmissionRecord {
+	metaPath := filepath.Join(submissionRoundDirFor(roundID), submissionID, "submission.json")
+	var rec SubmissionRecord
+	if err := readJSONFile(metaPath, &rec); err != nil {
+		return nil
+	}
+	return &rec
+}
+
+// 当 word 目录尚无实质 README 时，用提交表单字段拼成可供评审的 Markdown（避免只剩一行 URL）。
+func composeMarkdownFromSubmissionForm(rec *SubmissionRecord) string {
+	if rec == nil {
+		return ""
+	}
+	f := rec.Form
+	var b strings.Builder
+	if t := strings.TrimSpace(f.ProjectTitle); t != "" {
+		b.WriteString("# ")
+		b.WriteString(t)
+		b.WriteString("\n\n")
+	}
+	if t := strings.TrimSpace(f.GithubURL); t != "" {
+		b.WriteString("- **GitHub:** ")
+		b.WriteString(t)
+		b.WriteString("\n\n")
+	}
+	sections := []struct{ title, val string }{
+		{"One-liner", f.OneLiner},
+		{"Problem", f.Problem},
+		{"Solution", f.Solution},
+		{"Demo", f.DemoURL},
+		{"Why this chain", f.WhyThisChain},
+	}
+	for _, sec := range sections {
+		v := strings.TrimSpace(sec.val)
+		if v == "" {
+			continue
+		}
+		b.WriteString("## ")
+		b.WriteString(sec.title)
+		b.WriteString("\n\n")
+		b.WriteString(v)
+		b.WriteString("\n\n")
+	}
+	if d := strings.TrimSpace(f.DocsText); d != "" {
+		b.WriteString("## Additional documentation\n\n")
+		b.WriteString(d)
+		b.WriteString("\n")
+	}
+	return strings.TrimSpace(b.String())
+}
+
+type ghReadmeAPI struct {
+	Content  string `json:"content"`
+	Encoding string `json:"encoding"`
+}
+
+// 使用 GitHub REST API 拉取默认 README（application/vnd.github+json），无需本地 git clone。
+func fetchGithubRepoReadmeMarkdown(ctx context.Context, githubURL string) (string, error) {
+	owner, repo, ok := parseOwnerRepo(githubURL)
+	if !ok {
+		return "", errors.New("invalid github url")
+	}
+	token := githubToken()
+	ep := fmt.Sprintf("https://api.github.com/repos/%s/%s/readme", url.PathEscape(owner), url.PathEscape(repo))
+	var out ghReadmeAPI
+	if err := githubGet(ctx, token, ep, &out); err != nil {
+		return "", err
+	}
+	enc := strings.ToLower(strings.TrimSpace(out.Encoding))
+	if enc != "" && enc != "base64" {
+		return "", fmt.Errorf("unexpected readme encoding %q", out.Encoding)
+	}
+	raw := strings.ReplaceAll(out.Content, "\n", "")
+	raw = strings.ReplaceAll(raw, "\r", "")
+	dec, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		return "", err
+	}
+	return string(dec), nil
+}
+
+// resolveAuditMarkdownForSubmission 决定送进 LLM 的文档：优先保留 word 目录已有正文，其次 GitHub README API，再其次表单合成，最后占位符。
+func resolveAuditMarkdownForSubmission(ctx context.Context, roundID, submissionID, githubURL string) string {
+	target := fmt.Sprintf("%s_00_README.md", submissionID)
+	wordPath := filepath.Join(wordDirFor(roundID), target)
+	if data, err := os.ReadFile(wordPath); err == nil {
+		s := string(data)
+		if strings.TrimSpace(s) != "" && !isPlaceholderReadmeMarkdown(s) {
+			return s
+		}
+	}
+	rec := loadSubmissionRecordForAudit(roundID, submissionID)
+	if strings.TrimSpace(githubURL) != "" {
+		if md, err := fetchGithubRepoReadmeMarkdown(ctx, githubURL); err == nil && strings.TrimSpace(md) != "" {
+			return md
+		}
+	}
+	if rec != nil {
+		if composed := composeMarkdownFromSubmissionForm(rec); composed != "" {
+			return composed
+		}
+	}
+	return fmt.Sprintf("# Imported repository\n\n- URL: %s\n- round_id: %s\n\n%s\n", strings.TrimSpace(githubURL), roundID, placeholderReadmeMarker+".")
+}
+
+// processGithubRepoAndAudit 将实质 README/表单内容写入 word 目录并可选用多模型跑审（与 /api/audit 一致取均分）。
+// 不再无条件覆盖已由 postSubmit 写入的 docs_text *00_README.md；并尝试通过 GitHub API 拉取仓库 README。
+// models 为空且非 skipLLM 时仅使用 deepseek；customPrompt 为空则用内置占位说明。
+func processGithubRepoAndAudit(roundID, submissionID, githubURL string, skipLLM bool, models []string, outputLang, customPrompt string) error {
 	if err := ensureRoundDirs(roundID); err != nil {
 		return err
 	}
 	target := fmt.Sprintf("%s_00_README.md", submissionID)
 	wordPath := filepath.Join(wordDirFor(roundID), target)
-	body := fmt.Sprintf("# Imported repository\n\n- URL: %s\n- round_id: %s\n\nThis is a rebuilt-backend placeholder README snapshot.\n", githubURL, roundID)
+	ctxResolve, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	defer cancel()
+	body := resolveAuditMarkdownForSubmission(ctxResolve, roundID, submissionID, githubURL)
 	if err := os.WriteFile(wordPath, []byte(body), 0644); err != nil {
 		return err
 	}
 	if skipLLM {
 		return nil
 	}
-	content, score, _, _, err := runSingleModelAudit("deepseek", "en", "Auto-audit from GitHub ingest.", target, body, "")
-	if err != nil {
-		return err
+	ms := models
+	if len(ms) == 0 {
+		ms = []string{"deepseek"}
 	}
+	activeYAML, ruleID, _ := loadEffectiveRuleYAMLForRound(roundID)
+	cp := strings.TrimSpace(customPrompt)
+	if cp == "" {
+		cp = "Auto-audit from GitHub ingest."
+	}
+	ol := strings.TrimSpace(outputLang)
+	reports := make([]AuditReport, 0, len(ms))
+	okCount := 0
+	anyConflict := false
+	for _, m := range ms {
+		mm := strings.TrimSpace(strings.ToLower(m))
+		content, score, rMax, conflict, conflictVals, llmErr := runSingleModelAudit(mm, ol, cp, target, body, activeYAML)
+		rep := AuditReport{ModelName: m}
+		if llmErr != nil {
+			rep.Error = normalizeLLMErr(llmErr)
+			reports = append(reports, rep)
+			continue
+		}
+		rep.Content = content
+		rep.Score = score
+		rep.RubricRawMax = rMax
+		rep.ScoreConflict = conflict
+		rep.ScoreConflictValues = conflictVals
+		if conflict {
+			anyConflict = true
+		}
+		okCount++
+		reports = append(reports, rep)
+	}
+	if okCount == 0 {
+		return errors.New("all selected models failed audit")
+	}
+	avg, rawMax, letter := aggregateSavedResultScores(reports, activeYAML)
 	res := &SavedResult{
-		FileName:   target,
-		AvgScore:   score,
-		LetterGrade: gradeFromBands(score, ""),
-		Timestamp:  time.Now().UTC().Format(time.RFC3339),
-		Reports:    []AuditReport{{ModelName: "deepseek", Score: score, Content: content}},
-		RoundID:    roundID,
+		FileName:        target,
+		AvgScore:        avg,
+		RubricRawMax:    rawMax,
+		LetterGrade:     letter,
+		Timestamp:       time.Now().UTC().Format(time.RFC3339),
+		Reports:         reports,
+		RoundID:         roundID,
+		RuleVersionID:   ruleID,
+		RuleSHA256:      currentRuleSHA(roundID),
+		ScoreConflict:   anyConflict,
 	}
 	return writeResult(roundID, res)
 }
@@ -1230,9 +1853,25 @@ func postSubmit(c *gin.Context) {
 		return
 	}
 	subID := fmt.Sprintf("%d_%x", time.Now().UnixNano(), time.Now().UnixNano()%0xffffff)
+	trackRaw := strings.TrimSpace(c.PostForm("track"))
+	var trackVal string
+	if RoundHasConfiguredTracks(roundID) {
+		if trackRaw == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "track required for this round"})
+			return
+		}
+		tid, err := sanitizeRoundTrackID(trackRaw)
+		if err != nil || !validRoundTrackID(roundID, tid) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or unknown track"})
+			return
+		}
+		trackVal = tid
+	} else {
+		trackVal = trackRaw
+	}
 	form := SubmissionForm{
 		RoundID:      roundID,
-		Track:        c.PostForm("track"),
+		Track:        trackVal,
 		ProjectTitle: title,
 		OneLiner:     c.PostForm("one_liner"),
 		Problem:      c.PostForm("problem"),
@@ -1267,7 +1906,13 @@ func postSubmit(c *gin.Context) {
 		_ = os.MkdirAll(wordDirFor(roundID), 0755)
 		_ = os.WriteFile(filepath.Join(wordDirFor(roundID), subID+"_00_README.md"), []byte(form.DocsText), 0644)
 	}
-	_ = processGithubRepoAndAudit(roundID, subID, rec.Form.GithubURL, false)
+	var auditModels []string
+	if raw := strings.TrimSpace(c.PostForm("selected_models")); raw != "" {
+		_ = json.Unmarshal([]byte(raw), &auditModels)
+	}
+	auditOutLang := strings.TrimSpace(c.PostForm("output_lang"))
+	auditPrompt := strings.TrimSpace(c.PostForm("custom_prompt"))
+	_ = processGithubRepoAndAudit(roundID, subID, rec.Form.GithubURL, false, auditModels, auditOutLang, auditPrompt)
 	c.JSON(http.StatusOK, gin.H{"id": subID})
 }
 
@@ -1505,11 +2150,55 @@ func postRefreshSubmissionFromGithub(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "submission not found"})
 		return
 	}
-	if err := processGithubRepoAndAudit(roundID, subID, rec.Form.GithubURL, true); err != nil {
+	if err := processGithubRepoAndAudit(roundID, subID, rec.Form.GithubURL, true, nil, "", ""); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"target_file": fmt.Sprintf("%s_00_README.md", subID), "readme_only": false})
+}
+
+// auraCORSMiddleware：仅在本机部署树 /root/aura 维护（systemd 使用此目录编译的 aura）。
+// aura-judge-buddy/backend 对齐 GitHub，如需同样行为请把此处改动手工合并或拷贝到本树后再同步 go 文件。
+//
+// 允许前端（如 :3000）跨域访问 API（:8888）。未设置 AURA_CORS_ORIGINS 时回显 Origin；
+// 设置 AURA_CORS_ORIGINS 为逗号分隔列表时仅允许列表中的 Origin。
+func auraCORSMiddleware() gin.HandlerFunc {
+	allowSet := make(map[string]bool)
+	if raw := strings.TrimSpace(os.Getenv("AURA_CORS_ORIGINS")); raw != "" {
+		for _, o := range strings.Split(raw, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				allowSet[o] = true
+			}
+		}
+	}
+	return func(c *gin.Context) {
+		origin := strings.TrimSpace(c.GetHeader("Origin"))
+		var allow string
+		if len(allowSet) > 0 {
+			if origin != "" && allowSet[origin] {
+				allow = origin
+			}
+		} else if origin != "" {
+			allow = origin
+		} else {
+			allow = "*"
+		}
+		if allow != "" {
+			c.Header("Access-Control-Allow-Origin", allow)
+			if allow != "*" {
+				c.Header("Access-Control-Allow-Credentials", "true")
+			}
+		}
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Admin-Wallet")
+		c.Header("Access-Control-Max-Age", "86400")
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	}
 }
 
 func main() {
@@ -1530,14 +2219,17 @@ func main() {
 	_ = ensureRoundDirs(def)
 
 	r := gin.Default()
+	r.Use(auraCORSMiddleware())
 	r.GET("/api/admin-config", getAdminConfig)
 	r.GET("/api/files", getFiles)
+	r.GET("/api/file-content", getFileContent)
 	r.POST("/api/audit", postAudit)
 	r.GET("/api/ranking", getRanking)
 	r.GET("/api/judge-result", getJudgeResult)
 	r.POST("/api/submit", postSubmit)
 	r.GET("/api/submissions", getSubmissions)
 	r.GET("/api/submission/:id", getSubmissionByID)
+	r.PUT("/api/submission/:id/track", putSubmissionTrackHTTP)
 	r.DELETE("/api/submission/:id", deleteSubmission)
 	r.POST("/api/submission/:id/refresh-github", postRefreshSubmissionFromGithub)
 	r.GET("/api/file-github-urls", getFileGithubURLs)

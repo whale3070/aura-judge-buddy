@@ -1,7 +1,15 @@
 import type { LetterTier } from "@/lib/dimensionTier";
+import { scoreNorm100 } from "@/lib/scoreNorm";
 import { rankingItemDisplayLabel } from "@/lib/utils";
 
 export const DUEL_BRACKET_STORAGE_KEY = "aura_duel_bracket_snapshot_v1";
+
+/** localStorage key：按 round + 可选 track 分桶，避免多赛道擂台互相覆盖 */
+export function duelBracketLocalStorageKey(roundId: string, trackId?: string | null): string {
+  const r = (roundId ?? "").trim();
+  const t = (trackId ?? "").trim();
+  return `${DUEL_BRACKET_STORAGE_KEY}|${r}|${t || "__global__"}`;
+}
 
 export type BracketPoolTier = Extract<LetterTier, "S" | "A" | "B">;
 
@@ -54,6 +62,8 @@ export interface DuelBracketSnapshot {
   poolTier: BracketPoolTier;
   /** 与管理员页 ?round_id= 一致；用于排名页只加载本轮存证，避免跨轮次误配 */
   roundId?: string;
+  /** 与排名页 ?track= 一致；本场配置多赛道时必填（与后端存证一致） */
+  trackId?: string;
   /** 未设置或为 elimination 时同档排序沿用淘汰赛快照序号；lite/full 单循环时按 AI 基础分 + PK 净胜场排序 */
   arenaFormat?: ArenaFormat;
   /** 冠军在首位，其后按淘汰轮次倒序展开的败者（同轮多场按对阵顺序） */
@@ -75,6 +85,7 @@ export function getBracketSliceForTier(
   return {
     savedAt: snap.savedAt,
     roundId: snap.roundId,
+    trackId: snap.trackId,
     poolTier: tier,
     arenaFormat: slice.arenaFormat,
     rankedFileNames: slice.rankedFileNames,
@@ -145,6 +156,7 @@ export function pkWinCountForAliases(fileNames: string[], snap: DuelBracketSnaps
 export interface ArenaSortableRow {
   file_name: string;
   avg_score: number;
+  rubric_raw_max?: number;
 }
 
 /** 同档内排序：lite/full 单循环为降序 (avg_score + PK)，否则按展示名 */
@@ -167,11 +179,13 @@ export function sortArenaTierItems<T extends ArenaSortableRow>(
     const namesB = fileAliases.get(b.file_name) ?? [b.file_name];
     const pkA = pkWinCountForAliases(namesA, slice);
     const pkB = pkWinCountForAliases(namesB, slice);
-    const totalA = a.avg_score + pkA;
-    const totalB = b.avg_score + pkB;
+    const baseA = scoreNorm100(a.avg_score, a.rubric_raw_max);
+    const baseB = scoreNorm100(b.avg_score, b.rubric_raw_max);
+    const totalA = baseA + pkA;
+    const totalB = baseB + pkB;
     if (totalB !== totalA) return totalB - totalA;
     if (pkB !== pkA) return pkB - pkA;
-    if (b.avg_score !== a.avg_score) return b.avg_score - a.avg_score;
+    if (baseB !== baseA) return baseB - baseA;
     return label(a).localeCompare(label(b), "zh-Hans-CN");
   });
 }
@@ -269,7 +283,11 @@ export function serializeBracketRounds(
 export function saveDuelBracketSnapshot(payload: Omit<DuelBracketSnapshot, "savedAt">): DuelBracketSnapshot | null {
   try {
     const snap: DuelBracketSnapshot = { ...payload, savedAt: new Date().toISOString() };
-    localStorage.setItem(DUEL_BRACKET_STORAGE_KEY, JSON.stringify(snap));
+    const key = duelBracketLocalStorageKey(
+      (snap.roundId ?? "").trim(),
+      (snap.trackId ?? "").trim() || null
+    );
+    localStorage.setItem(key, JSON.stringify(snap));
     notifyDuelSnapshotUpdated();
     return snap;
   } catch {
@@ -279,17 +297,29 @@ export function saveDuelBracketSnapshot(payload: Omit<DuelBracketSnapshot, "save
 }
 
 /**
- * @param expectedRoundId 排名页传入当前 URL 的 round_id：与快照内 roundId 一致才采纳；若快照无 roundId（旧版存证）则仍加载，避免排行页与管理员页同轮却读不到擂台数据
+ * @param expectedRoundId 当前 URL 的 round_id
+ * @param expectedTrackId 多赛道时与 ?track= 一致；未配置赛道时传空
  */
-export function loadDuelBracketSnapshot(expectedRoundId?: string | null): DuelBracketSnapshot | null {
+export function loadDuelBracketSnapshot(
+  expectedRoundId?: string | null,
+  expectedTrackId?: string | null
+): DuelBracketSnapshot | null {
   try {
-    const raw = localStorage.getItem(DUEL_BRACKET_STORAGE_KEY);
+    const want = (expectedRoundId ?? "").trim();
+    const wantT = (expectedTrackId ?? "").trim();
+    const key = duelBracketLocalStorageKey(want, wantT || null);
+    let raw = localStorage.getItem(key);
+    // 兼容旧版单 key（仅无赛道分桶时仍可读）
+    if (!raw && wantT === "") {
+      raw = localStorage.getItem(DUEL_BRACKET_STORAGE_KEY);
+    }
     if (!raw) return null;
     const o = JSON.parse(raw) as DuelBracketSnapshot;
     if (!o?.poolTier || !Array.isArray(o.rankedFileNames) || !Array.isArray(o.matches)) return null;
-    const want = (expectedRoundId ?? "").trim();
     const got = (o.roundId ?? "").trim();
     if (want !== "" && got !== "" && got !== want) return null;
+    const gotT = (o.trackId ?? "").trim();
+    if (wantT !== "" && gotT !== "" && gotT !== wantT) return null;
     return o;
   } catch {
     return null;
@@ -302,9 +332,15 @@ export function isLegacyUnscopedBracketSnapshot(snap: DuelBracketSnapshot | null
   return (snap.roundId ?? "").trim() === "";
 }
 
-export function clearDuelBracketSnapshot(): void {
+export function clearDuelBracketSnapshot(roundId?: string | null, trackId?: string | null): void {
   try {
-    localStorage.removeItem(DUEL_BRACKET_STORAGE_KEY);
+    const r = (roundId ?? "").trim();
+    const t = (trackId ?? "").trim();
+    if (r) {
+      localStorage.removeItem(duelBracketLocalStorageKey(r, t || null));
+    } else {
+      localStorage.removeItem(DUEL_BRACKET_STORAGE_KEY);
+    }
     notifyDuelSnapshotUpdated();
   } catch {
     /* ignore */

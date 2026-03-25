@@ -9,7 +9,7 @@ import {
 } from "@/lib/hackathonRounds";
 import { fetchAdminConfigAPI, fetchRoundsListAPI, type RoundListEntry } from "@/lib/apiClient";
 import RoundJudgesTab from "./RoundJudgesTab";
-import { ArrowLeft, Pencil, Users, FileText, Scale, Download, BarChart3, Clock, CheckCircle, AlertCircle, Loader2, ExternalLink } from "lucide-react";
+import { ArrowLeft, Pencil, Users, FileText, Scale, Download, BarChart3, Clock, CheckCircle, AlertCircle, Loader2, ExternalLink, Layers } from "lucide-react";
 const tabs = ["overview", "projects", "judges", "rules", "exports"] as const;
 type Tab = (typeof tabs)[number];
 
@@ -143,6 +143,12 @@ export default function RoundDetail() {
               className="flex items-center gap-1.5 text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors"
             >
               <BarChart3 className="w-3.5 h-3.5" /> {t("rounds.gotoRanking")}
+            </Link>
+            <Link
+              to={`/rounds/${encodeURIComponent(id)}/tracks`}
+              className="flex items-center gap-1.5 text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Layers className="w-3.5 h-3.5" /> {t("rounds.gotoTracks")}
             </Link>
             <button
               onClick={() => navigate(`/rounds/${encodeURIComponent(id)}/edit`)}

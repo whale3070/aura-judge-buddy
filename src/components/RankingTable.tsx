@@ -1,9 +1,11 @@
 import { useI18n } from "@/lib/i18n";
 import { rankingItemDisplayLabel } from "@/lib/utils";
+import { compareRankingScoreDesc, scoreNorm100 } from "@/lib/scoreNorm";
 
 export interface RankingItem {
   file_name: string;
   avg_score: number;
+  rubric_raw_max?: number;
   timestamp: string;
   github_url?: string;
   rule_version_id?: string;
@@ -31,16 +33,16 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
     for (const item of rankings) {
       const title = rankingItemDisplayLabel(item, tm, {});
       const existing = projectMap.get(title);
-      if (!existing || item.avg_score > existing.avg_score) {
+      if (!existing || compareRankingScoreDesc(item, existing) > 0) {
         projectMap.set(title, item);
       }
     }
-    return Array.from(projectMap.values()).sort((a, b) => b.avg_score - a.avg_score);
+    return Array.from(projectMap.values()).sort((a, b) => compareRankingScoreDesc(b, a));
   })();
 
-  const scoreClass = (score: number) => {
-    if (score >= 80) return "text-primary font-bold drop-shadow-[0_0_5px_hsl(var(--primary)/0.8)]";
-    if (score < 60) return "text-destructive font-bold";
+  const scoreClass = (normPct: number) => {
+    if (normPct >= 80) return "text-primary font-bold drop-shadow-[0_0_5px_hsl(var(--primary)/0.8)]";
+    if (normPct < 60) return "text-destructive font-bold";
     return "text-warning font-bold";
   };
 
@@ -93,7 +95,9 @@ export default function RankingTable({ rankings, loading, selectedFile, onSelect
                         <span className="font-mono text-xs">{item.file_name}</span>
                       )}
                     </td>
-                    <td className={`p-3 ${scoreClass(item.avg_score)}`}>{item.avg_score.toFixed(1)}%</td>
+                    <td className={`p-3 ${scoreClass(scoreNorm100(item.avg_score, item.rubric_raw_max))}`}>
+                      {scoreNorm100(item.avg_score, item.rubric_raw_max).toFixed(1)}%
+                    </td>
                     <td className="p-3">
                       {item.rule_version_id ? (
                         <div>

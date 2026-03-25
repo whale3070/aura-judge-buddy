@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { MODELS } from "@/lib/prompts";
-import { API_BASE, roundNavSuffix, sanitizeRoundIdParam } from "@/lib/apiClient";
+import { API_BASE, fetchRoundTracksAPI, roundNavSuffix, sanitizeRoundIdParam, type RoundTrackEntry } from "@/lib/apiClient";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 
@@ -53,16 +53,50 @@ export default function Submit() {
   const [enableWebSearch, setEnableWebSearch] = useState(true);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [keywordInput, setKeywordInput] = useState("");
-  const [selectedModels, setSelectedModels] = useState<string[]>(
-    MODELS.filter((m) => m.defaultChecked).map((m) => m.id)
-  );
+  const [selectedModels, setSelectedModels] = useState<string[]>(["deepseek"]);
   const [customPrompt, setCustomPrompt] = useState(DEFAULT_SUBMIT_PROMPT);
+  const [roundTracks, setRoundTracks] = useState<RoundTrackEntry[]>([]);
+  const [tracksLoading, setTracksLoading] = useState(true);
+  const [selectedTrackId, setSelectedTrackId] = useState("");
+
+  useEffect(() => {
+    if (!roundIdRequired) {
+      setTracksLoading(false);
+      setRoundTracks([]);
+      setSelectedTrackId("");
+      return;
+    }
+    let cancelled = false;
+    setTracksLoading(true);
+    fetchRoundTracksAPI(roundIdRequired)
+      .then((tracks) => {
+        if (cancelled) return;
+        setRoundTracks(tracks);
+        setSelectedTrackId((prev) => (prev && tracks.some((x) => x.id === prev) ? prev : ""));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRoundTracks([]);
+          setSelectedTrackId("");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTracksLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [roundIdRequired]);
 
   if (!roundIdRequired) {
     return <Navigate to="/rounds" replace />;
   }
 
   const navSuffix = roundNavSuffix(roundIdRequired);
+  const rankingHref =
+    roundTracks.length > 0 && selectedTrackId
+      ? `/ranking?round_id=${encodeURIComponent(roundIdRequired)}&track=${encodeURIComponent(selectedTrackId)}`
+      : `/ranking${navSuffix}`;
 
   const set = (field: keyof SubmissionForm) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -124,6 +158,7 @@ export default function Submit() {
     if (!gh) return t("submit.validateGithubMissing");
     if (!/^https?:\/\/.+/i.test(gh)) return t("submit.validateGithub");
     if (!/github\.com/i.test(gh)) return t("submit.validateGithubHost");
+    if (roundTracks.length > 0 && !selectedTrackId.trim()) return t("submit.validateTrack");
     if (form.one_liner.length > 200) return t("submit.validateOneLinerLen");
     if (form.demo_url.trim() && !/^https?:\/\/.+/i.test(form.demo_url.trim()))
       return t("submit.validateDemo");
@@ -165,6 +200,9 @@ export default function Submit() {
       }
     }
     fd.append("round_id", roundIdRequired);
+    if (roundTracks.length > 0 && selectedTrackId.trim()) {
+      fd.append("track", selectedTrackId.trim());
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/submit`, {
@@ -203,7 +241,7 @@ export default function Submit() {
             <LanguageToggle />
           </div>
           <div className="flex gap-2">
-            <Link to={`/ranking${navSuffix}`} className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
+            <Link to={rankingHref} className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors">
               {t("nav.ranking")}
             </Link>
             <Link to={`/judge${navSuffix}`} className="text-xs border border-primary/40 px-3 py-1.5 text-primary hover:bg-primary/10 transition-colors">
@@ -244,6 +282,27 @@ export default function Submit() {
         <FieldRow label={t("submit.githubUrl")} hint="github_url *">
           <input value={form.github_url} onChange={set("github_url")} placeholder="https://github.com/your-org/your-repo" className="field-input" />
         </FieldRow>
+
+        {tracksLoading ? (
+          <p className="text-xs text-muted-foreground my-3">{t("submit.tracksLoading")}</p>
+        ) : roundTracks.length > 0 ? (
+          <FieldRow label={t("submit.trackLabel")} hint="track *">
+            <select
+              value={selectedTrackId}
+              onChange={(e) => setSelectedTrackId(e.target.value)}
+              className="field-input bg-background cursor-pointer"
+            >
+              <option value="">{t("submit.trackPlaceholder")}</option>
+              {roundTracks.map((tr) => (
+                <option key={tr.id} value={tr.id}>
+                  {(tr.name ?? "").trim() || tr.id}
+                  {(tr.name ?? "").trim() && tr.name !== tr.id ? ` (${tr.id})` : ""}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-muted-foreground mt-1">{t("submit.trackHint")}</p>
+          </FieldRow>
+        ) : null}
 
         <SectionLabel index={2} text={t("submit.section2")} />
 

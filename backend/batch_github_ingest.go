@@ -20,6 +20,8 @@ import (
 type BatchIngestGithubRequest struct {
 	RoundID string `json:"round_id"`
 	URLs    []string `json:"urls"`
+	// Track 写入各 submission.form.track；本场已配置 .aura_tracks.json 时必填且须为已登记赛道 id
+	Track string `json:"track,omitempty"`
 	// SkipDuplicates 为 nil 时默认 true：同一 round 下已存在相同仓库 URL 则跳过
 	SkipDuplicates *bool `json:"skip_duplicates"`
 	// AutoAudit 为 nil 时默认 true：clone 完成后对非 readme-only 仓库调用 LLM 自动裁决（与 AURA_AUTO_MODELS 一致）
@@ -155,6 +157,27 @@ func postBatchIngestGithub(c *gin.Context) {
 		return
 	}
 
+	trackVal := strings.TrimSpace(req.Track)
+	if RoundHasConfiguredTracks(roundID) {
+		if trackVal == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "本场已配置赛道，批量导入须指定 track"})
+			return
+		}
+		tid, err := sanitizeRoundTrackID(trackVal)
+		if err != nil || !validRoundTrackID(roundID, tid) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "无效或未知赛道"})
+			return
+		}
+		trackVal = tid
+	} else if trackVal != "" {
+		tid, err := sanitizeRoundTrackID(trackVal)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "赛道 id 格式无效"})
+			return
+		}
+		trackVal = tid
+	}
+
 	skipDup := true
 	if req.SkipDuplicates != nil {
 		skipDup = *req.SkipDuplicates
@@ -219,6 +242,7 @@ func postBatchIngestGithub(c *gin.Context) {
 			CreatedAt: now,
 			Form: SubmissionForm{
 				RoundID:      roundID,
+				Track:        trackVal,
 				ProjectTitle: title,
 				OneLiner:     "Batch ingest via /api/batch/ingest-github-urls",
 				Problem:      "",
@@ -276,7 +300,7 @@ func runBatchGithubIngestWorkers(roundID string, jobs []batchIngestJob, skipLLM 
 		go func() {
 			defer wg.Done()
 			for j := range ch {
-				if err := processGithubRepoAndAudit(roundID, j.ID, j.URL, skipLLM); err != nil {
+				if err := processGithubRepoAndAudit(roundID, j.ID, j.URL, skipLLM, nil, "", ""); err != nil {
 					fmt.Printf("[batch-ingest] round=%s id=%s url=%s err=%v\n", roundID, j.ID, j.URL, err)
 				} else {
 					fmt.Printf("[batch-ingest] round=%s id=%s url=%s ok\n", roundID, j.ID, j.URL)

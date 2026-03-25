@@ -22,7 +22,7 @@ type duelRequest struct {
 }
 
 var duelWinnerRE = regexp.MustCompile(`(?i)DUEL_WINNER\s*[:：=＝]\s*([ABabＡＢａｂ])`)
-var duelDimLineRE = regexp.MustCompile(`(?i)^\s*DUEL_DIM_([1-5])\s*[:：]\s*([ABabＡＢａｂ])\s*$`)
+var duelDimLineRE = regexp.MustCompile(`(?i)^\s*DUEL_DIM_([0-9]+)\s*[:：]\s*([ABabＡＢａｂ])\s*$`)
 var duelWinnerLineRE = regexp.MustCompile(`(?i)^\s*DUEL_WINNER\s*[:：=＝]\s*([ABabＡＢａｂ])\s*$`)
 
 func validateWordFileBaseName(name string) bool {
@@ -57,8 +57,21 @@ func parseDuelWinnerFromRaw(raw string) string {
 	return normalizeDuelSide(last)
 }
 
-// parseDuelDimVotes 解析文末 DUEL_DIM_1:A … DUEL_DIM_5:B
-func parseDuelDimVotes(raw string) (aCount, bCount int) {
+func duelMajorityNeed(nDims int) int {
+	if nDims <= 0 {
+		nDims = 5
+	}
+	return nDims/2 + 1
+}
+
+// parseDuelDimVotes 解析文末 DUEL_DIM_1:A …（仅统计 1..nDims）
+func parseDuelDimVotes(raw string, nDims int) (aCount, bCount int) {
+	if nDims <= 0 {
+		nDims = 5
+	}
+	if nDims > 24 {
+		nDims = 24
+	}
 	seen := make(map[int]string)
 	for _, line := range strings.Split(raw, "\n") {
 		m := duelDimLineRE.FindStringSubmatch(strings.TrimSpace(line))
@@ -66,7 +79,7 @@ func parseDuelDimVotes(raw string) (aCount, bCount int) {
 			continue
 		}
 		idx, err := strconv.Atoi(m[1])
-		if err != nil || idx < 1 || idx > 5 {
+		if err != nil || idx < 1 || idx > nDims {
 			continue
 		}
 		side := normalizeDuelSide(m[2])
@@ -85,13 +98,14 @@ func parseDuelDimVotes(raw string) (aCount, bCount int) {
 	return aCount, bCount
 }
 
-// resolveDuelWinner 优先按「五维中 ≥3 维获胜」多数决；否则回退到 DUEL_WINNER 行
-func resolveDuelWinner(raw string) string {
-	aCnt, bCnt := parseDuelDimVotes(raw)
-	if aCnt >= 3 {
+// resolveDuelWinner 优先按「多数维度获胜」；否则回退到 DUEL_WINNER 行
+func resolveDuelWinner(raw string, nDims int) string {
+	need := duelMajorityNeed(nDims)
+	aCnt, bCnt := parseDuelDimVotes(raw, nDims)
+	if aCnt >= need {
 		return "A"
 	}
-	if bCnt >= 3 {
+	if bCnt >= need {
 		return "B"
 	}
 	if aCnt > bCnt && aCnt > 0 {
@@ -125,7 +139,13 @@ func stripDuelMachineFooter(raw string) string {
 	return strings.TrimSpace(strings.Join(lines[:end+1], "\n"))
 }
 
-func buildDimensionWinnersJSON(raw string) []gin.H {
+func buildDimensionWinnersJSON(raw string, nDims int) []gin.H {
+	if nDims <= 0 {
+		nDims = 5
+	}
+	if nDims > 24 {
+		nDims = 24
+	}
 	seen := make(map[int]string)
 	for _, line := range strings.Split(raw, "\n") {
 		m := duelDimLineRE.FindStringSubmatch(strings.TrimSpace(line))
@@ -133,7 +153,7 @@ func buildDimensionWinnersJSON(raw string) []gin.H {
 			continue
 		}
 		idx, err := strconv.Atoi(m[1])
-		if err != nil || idx < 1 || idx > 5 {
+		if err != nil || idx < 1 || idx > nDims {
 			continue
 		}
 		side := normalizeDuelSide(m[2])
@@ -143,7 +163,7 @@ func buildDimensionWinnersJSON(raw string) []gin.H {
 		seen[idx] = side
 	}
 	out := make([]gin.H, 0, len(seen))
-	for i := 1; i <= 5; i++ {
+	for i := 1; i <= nDims; i++ {
 		if w, ok := seen[i]; ok {
 			out = append(out, gin.H{"index": i, "winner": w})
 		}
@@ -222,30 +242,47 @@ func postDuel(c *gin.Context) {
 		rulesBlock = "[ACTIVE_RULES_YAML]\n" + activeYAML + "\n[/ACTIVE_RULES_YAML]\n\n"
 	}
 
+	rs := parseRuleSetYAMLString(activeYAML)
+	nDims := 5
+	dimBulletLines := []string{
+		"   Dim 1 — 创新性 (Innovation)",
+		"   Dim 2 — 技术实现 (Technical execution)",
+		"   Dim 3 — 商业价值 (Business value)",
+		"   Dim 4 — 用户体验 (User experience)",
+		"   Dim 5 — 落地可行性 (Feasibility)",
+	}
+	if rs != nil && len(rs.Dimensions) > 0 {
+		nDims = len(rs.Dimensions)
+		dimBulletLines = dimBulletLines[:0]
+		for i, d := range rs.Dimensions {
+			dimBulletLines = append(dimBulletLines, fmt.Sprintf("   Dim %d — %s", i+1, strings.TrimSpace(d.Name)))
+		}
+	}
+	needWins := duelMajorityNeed(nDims)
+	var machineFooter strings.Builder
+	for i := 1; i <= nDims; i++ {
+		fmt.Fprintf(&machineFooter, "DUEL_DIM_%d:A_or_B\n", i)
+	}
+	machineFooter.WriteString("DUEL_WINNER:A_or_B\n")
+	nMachineLines := nDims + 1
+
 	promptCore := fmt.Sprintf(
 		"You are an expert hackathon judge running a HEAD-TO-HEAD elimination.\n"+
-			"Compare PROJECT A vs PROJECT B using ACTIVE_RULES_YAML when present.\n\n"+
+			"Compare PROJECT A vs PROJECT B using ACTIVE_RULES_YAML when present (same scales and dimension names as the main audit).\n\n"+
 			"[PROJECT A — file: %s]\n%s\n[/PROJECT A]\n\n"+
 			"[PROJECT B — file: %s]\n%s\n[/PROJECT B]\n\n"+
 			"Tasks:\n"+
-			"1) Compare the two projects on EXACTLY these FIVE dimensions (same 0–20 rubric as the main audit; say which side is stronger on each):\n"+
-			"   Dim 1 — 创新性 (Innovation)\n"+
-			"   Dim 2 — 技术实现 (Technical execution)\n"+
-			"   Dim 3 — 商业价值 (Business value)\n"+
-			"   Dim 4 — 用户体验 (User experience)\n"+
-			"   Dim 5 — 落地可行性 (Feasibility)\n"+
+			"1) Compare the two projects on EXACTLY these %d dimensions (say which side is stronger on each):\n%s\n"+
 			"2) For EACH dimension, write a substantive comparative analysis (like your usual audit style), then state clearly whether PROJECT A or PROJECT B wins that dimension.\n"+
-			"3) Overall match rule: the duel winner is the project that wins **at least 3** of the 5 dimensions (majority). You MUST make a decision so one side reaches 3 wins (no 2–2 tie).\n"+
-			"4) After the full narrative, output EXACTLY these 6 lines at the very end — no extra text after line 6. Use uppercase A or B only:\n"+
-			"DUEL_DIM_1:A_or_B\n"+
-			"DUEL_DIM_2:A_or_B\n"+
-			"DUEL_DIM_3:A_or_B\n"+
-			"DUEL_DIM_4:A_or_B\n"+
-			"DUEL_DIM_5:A_or_B\n"+
-			"DUEL_WINNER:A_or_B\n"+
-			"DUEL_WINNER must be the same letter as the side that won >=3 dimensions.\n",
+			"3) Overall match rule: the duel winner is the project that wins **at least %d** of the %d dimensions (strict majority). You MUST break any tie so one side reaches %d wins.\n"+
+			"4) After the full narrative, output EXACTLY these %d lines at the very end — no extra text after the last line. Use uppercase A or B only:\n%s"+
+			"DUEL_WINNER must match the side that won >=%d dimensions.\n",
 		fa, string(docA),
 		fb, string(docB),
+		nDims, strings.Join(dimBulletLines, "\n"),
+		needWins, nDims, needWins,
+		nMachineLines, machineFooter.String(),
+		needWins,
 	)
 
 	fullUser := duelLanguageBlock(lang) + rulesBlock + promptCore
@@ -267,13 +304,13 @@ func postDuel(c *gin.Context) {
 		return
 	}
 	raw := strings.TrimSpace(resp.Choices[0].Message.Content)
-	winner := resolveDuelWinner(raw)
+	winner := resolveDuelWinner(raw, nDims)
 	modelTag := strings.TrimSpace(req.Model)
 	if modelTag == "" {
 		modelTag = "deepseek"
 	}
 
-	aCnt, bCnt := parseDuelDimVotes(raw)
+	aCnt, bCnt := parseDuelDimVotes(raw, nDims)
 	reasonBody := stripDuelMachineFooter(raw)
 	if reasonBody == "" {
 		reasonBody = raw
@@ -284,7 +321,7 @@ func postDuel(c *gin.Context) {
 		"reason":             reasonBody,
 		"raw":                raw,
 		"model":              modelTag,
-		"dimension_winners":  buildDimensionWinnersJSON(raw),
+		"dimension_winners":  buildDimensionWinnersJSON(raw, nDims),
 		"dim_vote_counts":    gin.H{"A": aCnt, "B": bCnt},
 	})
 }

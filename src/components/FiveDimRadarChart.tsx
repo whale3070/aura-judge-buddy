@@ -54,6 +54,8 @@ export default function FiveDimRadarChart({ reports }: Props) {
   }
 
   const maxScore = mode.scale;
+  const sectionTitle = mode.scale === 20 ? t("ranking.radarSectionTitle5") : t("ranking.radarSectionTitle4");
+  const footnote = mode.scale === 20 ? t("ranking.radarFootnote5") : t("ranking.radarFootnote4");
   const data = mode.keys.map((k) => ({
     subject:
       mode.scale === 20 ? t(DIM_LABEL_KEY[k as FiveDimKeyZh]) : (k as string),
@@ -61,73 +63,76 @@ export default function FiveDimRadarChart({ reports }: Props) {
   }));
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 items-stretch lg:items-center">
-      <div className="w-full lg:w-[58%] h-[min(320px,55vw)] min-h-[240px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart cx="50%" cy="50%" outerRadius="72%" data={data}>
-            <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.9} />
-            <PolarAngleAxis
-              dataKey="subject"
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-            />
-            <PolarRadiusAxis
-              angle={30}
-              domain={[0, maxScore]}
-              tickCount={5}
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }}
-            />
-            <Radar
-              name={t("ranking.radarSeriesName")}
-              dataKey="score"
-              stroke="hsl(var(--primary))"
-              fill="hsl(var(--primary))"
-              fillOpacity={0.32}
-              strokeWidth={2}
-            />
-            <Tooltip
-              formatter={(v: number) => [`${v} / ${maxScore}`, t("ranking.radarTooltipScore")]}
-              contentStyle={{
-                background: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "6px",
-                fontSize: "12px",
-              }}
-            />
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="w-full lg:flex-1 space-y-1">
-        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-          {t("ranking.radarScoreTableTitle")}
-        </p>
-        <ul className="space-y-2 text-sm">
-          {mode.scale === 20
-            ? FIVE_DIM_KEYS_ZH.map((k) => (
-                <li
-                  key={k}
-                  className="flex justify-between gap-3 items-baseline border-b border-border/50 pb-2 last:border-0"
-                >
-                  <span className="text-muted-foreground shrink-0">{t(DIM_LABEL_KEY[k])}</span>
-                  <span className="font-mono font-semibold text-primary tabular-nums">
-                    {(mode.avg as Record<FiveDimKeyZh, number>)[k].toFixed(1)}
-                    <span className="text-muted-foreground font-normal text-xs ml-1">/ 20</span>
-                  </span>
-                </li>
-              ))
-            : FOUR_DIM_RUBRIC_KEYS_EN.map((k) => (
-                <li
-                  key={k}
-                  className="flex justify-between gap-3 items-baseline border-b border-border/50 pb-2 last:border-0"
-                >
-                  <span className="text-muted-foreground shrink-0">{k}</span>
-                  <span className="font-mono font-semibold text-primary tabular-nums">
-                    {(mode.avg as Record<FourDimRubricKeyEn, number>)[k].toFixed(1)}
-                    <span className="text-muted-foreground font-normal text-xs ml-1">/ 10</span>
-                  </span>
-                </li>
-              ))}
-        </ul>
-        <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">{t("ranking.radarFootnote")}</p>
+    <div className="flex flex-col gap-3">
+      <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{sectionTitle}</div>
+      <div className="flex flex-col lg:flex-row gap-6 items-stretch lg:items-center">
+        <div className="w-full lg:w-[58%] h-[min(320px,55vw)] min-h-[240px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart cx="50%" cy="50%" outerRadius="72%" data={data}>
+              <PolarGrid stroke="hsl(var(--border))" strokeOpacity={0.9} />
+              <PolarAngleAxis
+                dataKey="subject"
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+              />
+              <PolarRadiusAxis
+                angle={30}
+                domain={[0, maxScore]}
+                tickCount={5}
+                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }}
+              />
+              <Radar
+                name={t("ranking.radarSeriesName")}
+                dataKey="score"
+                stroke="hsl(var(--primary))"
+                fill="hsl(var(--primary))"
+                fillOpacity={0.32}
+                strokeWidth={2}
+              />
+              <Tooltip
+                formatter={(v: number) => [`${v} / ${maxScore}`, t("ranking.radarTooltipScore")]}
+                contentStyle={{
+                  background: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                }}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="w-full lg:flex-1 space-y-1">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
+            {t("ranking.radarScoreTableTitle")}
+          </p>
+          <ul className="space-y-2 text-sm">
+            {mode.scale === 20
+              ? FIVE_DIM_KEYS_ZH.map((k) => (
+                  <li
+                    key={k}
+                    className="flex justify-between gap-3 items-baseline border-b border-border/50 pb-2 last:border-0"
+                  >
+                    <span className="text-muted-foreground shrink-0">{t(DIM_LABEL_KEY[k])}</span>
+                    <span className="font-mono font-semibold text-primary tabular-nums">
+                      {(mode.avg as Record<FiveDimKeyZh, number>)[k].toFixed(1)}
+                      <span className="text-muted-foreground font-normal text-xs ml-1">/ 20</span>
+                    </span>
+                  </li>
+                ))
+              : FOUR_DIM_RUBRIC_KEYS_EN.map((k) => (
+                  <li
+                    key={k}
+                    className="flex justify-between gap-3 items-baseline border-b border-border/50 pb-2 last:border-0"
+                  >
+                    <span className="text-muted-foreground shrink-0">{k}</span>
+                    <span className="font-mono font-semibold text-primary tabular-nums">
+                      {(mode.avg as Record<FourDimRubricKeyEn, number>)[k].toFixed(1)}
+                      <span className="text-muted-foreground font-normal text-xs ml-1">/ 10</span>
+                    </span>
+                  </li>
+                ))}
+          </ul>
+          <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">{footnote}</p>
+        </div>
       </div>
     </div>
   );

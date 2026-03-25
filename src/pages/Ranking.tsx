@@ -51,8 +51,8 @@ export default function Ranking() {
   const trackFilter = useMemo(() => {
     if (roundTracks.length === 0) return "all";
     if (trackQ && allowedTrackIds.has(trackQ)) return trackQ;
-    return "all";
-  }, [roundTracks.length, allowedTrackIds, trackQ]);
+    return roundTracks[0]?.id ?? "all";
+  }, [roundTracks, allowedTrackIds, trackQ]);
 
   useEffect(() => {
     setRuleFilterOverride(undefined);
@@ -71,16 +71,27 @@ export default function Ranking() {
 
       const allowed = new Set(tracks.map((t) => t.id));
       const q = trackQ;
-      if (q && (tracks.length === 0 || !allowed.has(q))) {
+      if (tracks.length > 0) {
+        if (!q || !allowed.has(q)) {
+          const next =
+            typeof window !== "undefined"
+              ? new URLSearchParams(window.location.search)
+              : new URLSearchParams();
+          next.set("track", tracks[0].id);
+          navigate(`/ranking?${next.toString()}`, { replace: true });
+          return;
+        }
+      } else if (q) {
         const next =
           typeof window !== "undefined"
             ? new URLSearchParams(window.location.search)
             : new URLSearchParams();
         next.delete("track");
         navigate(`/ranking?${next.toString()}`, { replace: true });
+        return;
       }
 
-      const rankingTrack = tracks.length > 0 && q && allowed.has(q) ? q : undefined;
+      const rankingTrack = tracks.length > 0 ? q : undefined;
 
       try {
         const [r, titles, githubMap, forkMap, projectTitles, ver] = await Promise.all([
@@ -130,14 +141,18 @@ export default function Ranking() {
 
   const trackTabs = useMemo(() => {
     if (roundTracks.length === 0) return [];
-    return [
-      { id: "all" as const, label: t("ranking.trackTabAll") },
-      ...roundTracks.map((tr) => ({
-        id: tr.id,
-        label: (tr.name ?? "").trim() || tr.id,
-      })),
-    ];
-  }, [roundTracks, t]);
+    return roundTracks.map((tr) => ({
+      id: tr.id,
+      label: (tr.name ?? "").trim() || tr.id,
+      rankingCount: tr.ranking_count,
+    }));
+  }, [roundTracks]);
+
+  const trackTotalListed = useMemo(() => {
+    const cur = roundTracks.find((x) => x.id === trackFilter);
+    if (cur != null && typeof cur.ranking_count === "number") return cur.ranking_count;
+    return !loading ? rankings.length : undefined;
+  }, [roundTracks, trackFilter, loading, rankings.length]);
 
   const handleDownloadMarkdown = () => {
     if (filteredRankings.length === 0) {
@@ -150,6 +165,7 @@ export default function Ranking() {
       lang,
       t,
       roundId: roundIdRequired,
+      duelTrackId: trackTabs.length > 0 ? trackFilter : undefined,
       pageUrl,
       rankings: filteredRankings,
       allRankingsForAliases: rankings,
@@ -193,6 +209,9 @@ export default function Ranking() {
         <p className="text-center text-xs text-muted-foreground mb-4">
           {t("ranking.note")}
         </p>
+        {roundTracks.length > 0 ? (
+          <p className="text-center text-xs text-accent/90 mb-3 max-w-xl mx-auto">{t("ranking.trackScopeNote")}</p>
+        ) : null}
         {trackTabs.length > 0 ? (
           <div className="flex gap-0 mb-3 border-b border-border justify-center flex-wrap">
             {trackTabs.map((tb) => (
@@ -201,18 +220,25 @@ export default function Ranking() {
                 type="button"
                 onClick={() => {
                   const next = new URLSearchParams(searchParams);
-                  if (tb.id === "all") next.delete("track");
-                  else next.set("track", tb.id);
+                  next.set("track", tb.id);
                   navigate(`/ranking?${next.toString()}`);
                 }}
                 className={`px-4 py-2 text-xs font-bold tracking-wider transition-colors ${
                   trackFilter === tb.id ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {tb.label}
+                {t("ranking.trackTabLabel", {
+                  label: tb.label,
+                  n: String(tb.rankingCount ?? "—"),
+                })}
               </button>
             ))}
           </div>
+        ) : null}
+        {trackTabs.length > 0 && trackTotalListed != null ? (
+          <p className="text-center text-[11px] text-muted-foreground mb-2">
+            {t("ranking.trackTotalInScope", { n: String(trackTotalListed) })}
+          </p>
         ) : null}
         <RankingRuleFilterBar
           value={effectiveRuleFilterId}
@@ -220,7 +246,10 @@ export default function Ranking() {
           options={ruleOptions}
           disabled={loading}
         />
-        <DuelLegacySnapshotBanner expectedRoundId={roundIdRequired} />
+        <DuelLegacySnapshotBanner
+          expectedRoundId={roundIdRequired}
+          expectedTrackId={trackTabs.length > 0 ? trackFilter : undefined}
+        />
         <RankingByTierPanel
           roundId={roundIdRequired}
           allRankingsForAliases={rankings}
@@ -230,6 +259,7 @@ export default function Ranking() {
           fileForkMap={fileForkMap}
           fileGithubMap={fileGithubMap}
           emptyHint={emptyHint}
+          duelTrackId={trackTabs.length > 0 ? trackFilter : undefined}
         />
       </div>
     </div>

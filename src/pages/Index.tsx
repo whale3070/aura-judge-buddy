@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   fetchFilesAPI,
   submitAuditAPI,
@@ -8,11 +8,13 @@ import {
   fetchFileTitlesAPI,
   fetchFileForkStatusesAPI,
   fetchRuleVersionsAPI,
+  fetchRoundTracksAPI,
   type AuditReport,
   type SavedResult,
   type RuleVersionMeta,
+  type RoundTrackEntry,
   effectiveRoundIdFromSearchParam,
-  roundNavSuffix,
+  roundNavSuffixWithTrack,
 } from "@/lib/apiClient";
 import JudgeDetail from "@/components/JudgeDetail";
 import ActiveRulePanel from "@/components/ActiveRulePanel";
@@ -43,6 +45,7 @@ interface ReportEntry {
   id: string;
   fileName: string;
   avgScore: number | null;
+  rubricRawMax?: number;
   statusText: string;
   reports: AuditReport[];
   error?: string;
@@ -60,6 +63,15 @@ function extractAvgScore(reports: AuditReport[]): number | null {
   const nums = reports.map((r) => Number(r.score)).filter(Number.isFinite);
   if (!nums.length) return null;
   return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10;
+}
+
+function cardAggregateFromAuditResponse(data: SavedResult): { avg: number | null; rubricMax?: number } {
+  const rubricMax =
+    data.rubric_raw_max != null && data.rubric_raw_max > 0 ? data.rubric_raw_max : undefined;
+  if (typeof data.avg_score === "number" && Number.isFinite(data.avg_score)) {
+    return { avg: data.avg_score, rubricMax };
+  }
+  return { avg: extractAvgScore(data.reports), rubricMax };
 }
 
 async function withTimeout<T>(p: Promise<T>, timeoutMs: number, onTimeout?: () => void): Promise<T> {
@@ -82,9 +94,19 @@ async function withTimeout<T>(p: Promise<T>, timeoutMs: number, onTimeout?: () =
 export default function Index() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const roundQ = searchParams.get("round_id");
+  const trackQ = (searchParams.get("track") || "").trim();
   const effectiveRound = effectiveRoundIdFromSearchParam(roundQ);
-  const navSuffix = roundNavSuffix(roundQ);
+  const [roundTracks, setRoundTracks] = useState<RoundTrackEntry[]>([]);
+  const allowedTrackIds = useMemo(() => new Set(roundTracks.map((tr) => tr.id)), [roundTracks]);
+  const trackFilter = useMemo(() => {
+    if (roundTracks.length === 0) return "all";
+    if (trackQ && allowedTrackIds.has(trackQ)) return trackQ;
+    return roundTracks[0]?.id ?? "all";
+  }, [roundTracks, allowedTrackIds, trackQ]);
+  const rankingTrackForAPI = trackFilter === "all" ? undefined : trackFilter;
+  const navSuffix = roundNavSuffixWithTrack(roundQ, roundTracks.length > 0 ? trackFilter : undefined);
   const [files, setFiles] = useState<string[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState("");
@@ -117,27 +139,88 @@ export default function Index() {
 
   useEffect(() => {
     setRuleFilterOverride(undefined);
-  }, [roundQ]);
+  }, [roundQ, trackFilter]);
 
-  const loadData = useCallback(async () => {
-    const [f, r, t, fk, ver] = await Promise.all([
-      fetchFilesAPI(roundQ).catch(() => []),
-      fetchRankingsAPI(roundQ).catch(() => []),
-      fetchFileTitlesAPI(roundQ).catch(() => ({} as Record<string, string>)),
-      fetchFileForkStatusesAPI(roundQ).catch(() => ({} as Record<string, boolean>)),
-      fetchRuleVersionsAPI(roundQ).catch(() => ({ versions: [] as RuleVersionMeta[] })),
-    ]);
-    setFiles(f);
-    if (f.length > 0) setSelectedFile(f[0]);
-    setFilesLoading(false);
-    setRankings(r);
-    setTitleMap(t);
-    setForkMap(fk);
-    setVersionMetas(ver.versions ?? []);
-    setRankingsLoading(false);
-  }, [roundQ]);
+  useEffect(() => {
+    const eff = (effectiveRound ?? "").trim();
+    if (!eff) {
+      void (async () => {
+        const [f, r, t, fk, ver] = await Promise.all([
+          fetchFilesAPI(roundQ).catch(() => []),
+          fetchRankingsAPI(roundQ, undefined).catch(() => []),
+          fetchFileTitlesAPI(roundQ).catch(() => ({} as Record<string, string>)),
+          fetchFileForkStatusesAPI(roundQ).catch(() => ({} as Record<string, boolean>)),
+          fetchRuleVersionsAPI(roundQ).catch(() => ({ versions: [] as RuleVersionMeta[] })),
+        ]);
+        setFiles(f);
+        if (f.length > 0) setSelectedFile(f[0]);
+        setFilesLoading(false);
+        setRankings(r);
+        setTitleMap(t);
+        setForkMap(fk);
+        setRoundTracks([]);
+        setVersionMetas(ver.versions ?? []);
+        setRankingsLoading(false);
+      })();
+      return;
+    }
 
-  useEffect(() => { loadData(); }, [loadData]);
+    let cancelled = false;
+    setRankingsLoading(true);
+    setFilesLoading(true);
+
+    void (async () => {
+      const tracks = await fetchRoundTracksAPI(eff);
+      if (cancelled) return;
+      setRoundTracks(tracks);
+      const allowed = new Set(tracks.map((tr) => tr.id));
+      const q = trackQ;
+      if (tracks.length > 0) {
+        if (!q || !allowed.has(q)) {
+          const next =
+            typeof window !== "undefined"
+              ? new URLSearchParams(window.location.search)
+              : new URLSearchParams();
+          next.set("track", tracks[0].id);
+          navigate(`/judge?${next.toString()}`, { replace: true });
+          return;
+        }
+      } else if (q) {
+        const next =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search)
+            : new URLSearchParams();
+        next.delete("track");
+        navigate(`/judge?${next.toString()}`, { replace: true });
+        return;
+      }
+
+      const rankingTrack = tracks.length > 0 ? q : undefined;
+      try {
+        const [f, r, t, fk, ver] = await Promise.all([
+          fetchFilesAPI(roundQ).catch(() => []),
+          fetchRankingsAPI(roundQ, rankingTrack).catch(() => []),
+          fetchFileTitlesAPI(roundQ).catch(() => ({} as Record<string, string>)),
+          fetchFileForkStatusesAPI(roundQ).catch(() => ({} as Record<string, boolean>)),
+          fetchRuleVersionsAPI(roundQ).catch(() => ({ versions: [] as RuleVersionMeta[] })),
+        ]);
+        if (cancelled) return;
+        setFiles(f);
+        if (f.length > 0) setSelectedFile(f[0]);
+        setFilesLoading(false);
+        setRankings(r);
+        setTitleMap(t);
+        setForkMap(fk);
+        setVersionMetas(ver.versions ?? []);
+      } finally {
+        if (!cancelled) setRankingsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roundQ, trackQ, navigate, effectiveRound]);
 
   useEffect(() => {
     fetchAdminConfigAPI()
@@ -180,12 +263,13 @@ export default function Index() {
         project_keywords: enableWebSearch ? projectKeywords : undefined,
         round_id: effectiveRound,
       });
-      const avg = extractAvgScore(data.reports);
+      const { avg, rubricMax } = cardAggregateFromAuditResponse(data);
       removeReport(id);
       addReport({
         id: randomUUIDCompat(),
         fileName: selectedFile,
         avgScore: avg,
+        rubricRawMax: rubricMax,
         statusText: "SINGLE_OK",
         reports: data.reports,
         open: true,
@@ -197,7 +281,7 @@ export default function Index() {
         competitorResultsCount: data.competitor_results_count,
         projectKeywords: enableWebSearch ? projectKeywords : undefined,
       });
-      const r = await fetchRankingsAPI(roundQ);
+      const r = await fetchRankingsAPI(roundQ, rankingTrackForAPI);
       setRankings(r);
     } catch (err: any) {
       removeReport(id);
@@ -226,7 +310,7 @@ export default function Index() {
     }
     let analyzed = new Set<string>();
     try {
-      const r = await fetchRankingsAPI(roundQ);
+      const r = await fetchRankingsAPI(roundQ, rankingTrackForAPI);
       setRankings(r);
       analyzed = new Set(r.map((x) => x.file_name));
     } catch { /* continue */ }
@@ -268,12 +352,13 @@ export default function Index() {
             () => ac.abort()
           );
           inflightAbortControllersRef.current.delete(ac);
-          const avg = extractAvgScore(data.reports);
+          const { avg, rubricMax } = cardAggregateFromAuditResponse(data);
           removeReport(placeholderId);
           addReport({
             id: randomUUIDCompat(),
             fileName: file,
             avgScore: avg,
+            rubricRawMax: rubricMax,
             statusText: `WORKER#${workerId} OK`,
             reports: data.reports,
             open: false,
@@ -291,7 +376,7 @@ export default function Index() {
         setLastProgressAtMs(Date.now());
         if (done % 3 === 0 || done === total) {
           try {
-            const r = await fetchRankingsAPI(roundQ);
+            const r = await fetchRankingsAPI(roundQ, rankingTrackForAPI);
             setRankings(r);
           } catch {
             /* */
@@ -312,7 +397,7 @@ export default function Index() {
       open: false,
     });
     try {
-      const r = await fetchRankingsAPI(roundQ);
+      const r = await fetchRankingsAPI(roundQ, rankingTrackForAPI);
       setRankings(r);
     } catch {
       /* */
@@ -374,12 +459,13 @@ export default function Index() {
             () => ac.abort()
           );
           inflightAbortControllersRef.current.delete(ac);
-          const avg = extractAvgScore(data.reports);
+          const { avg, rubricMax } = cardAggregateFromAuditResponse(data);
           removeReport(placeholderId);
           addReport({
             id: randomUUIDCompat(),
             fileName: file,
             avgScore: avg,
+            rubricRawMax: rubricMax,
             statusText: `REJUDGE#${workerId} OK`,
             reports: data.reports,
             open: false,
@@ -397,7 +483,7 @@ export default function Index() {
         setLastProgressAtMs(Date.now());
         if (done % 3 === 0 || done === total) {
           try {
-            const r = await fetchRankingsAPI(roundQ);
+            const r = await fetchRankingsAPI(roundQ, rankingTrackForAPI);
             setRankings(r);
           } catch {
             /* */
@@ -418,7 +504,7 @@ export default function Index() {
       open: false,
     });
     try {
-      const r = await fetchRankingsAPI(roundQ);
+      const r = await fetchRankingsAPI(roundQ, rankingTrackForAPI);
       setRankings(r);
     } catch {
       /* */
@@ -478,7 +564,28 @@ export default function Index() {
         {effectiveRound ? (
           <p className="text-center text-[11px] font-mono text-accent mb-2">
             round_id={effectiveRound}
+            {roundTracks.length > 0 ? ` · track=${trackFilter}` : ""}
           </p>
+        ) : null}
+        {roundTracks.length > 0 ? (
+          <div className="flex gap-0 mb-3 border-b border-border justify-center flex-wrap">
+            {roundTracks.map((tb) => (
+              <button
+                key={tb.id}
+                type="button"
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams);
+                  next.set("track", tb.id);
+                  navigate(`/judge?${next.toString()}`);
+                }}
+                className={`px-4 py-2 text-xs font-bold tracking-wider transition-colors ${
+                  trackFilter === tb.id ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {(tb.name ?? "").trim() || tb.id}
+              </button>
+            ))}
+          </div>
         ) : null}
 
         <div className="flex justify-center gap-3 mb-6">
@@ -507,7 +614,10 @@ export default function Index() {
         </div>
 
         <ActiveRulePanel />
-        <DuelLegacySnapshotBanner expectedRoundId={effectiveRound ?? ""} />
+        <DuelLegacySnapshotBanner
+          expectedRoundId={effectiveRound ?? ""}
+          expectedTrackId={roundTracks.length > 0 ? trackFilter : undefined}
+        />
         <div className="mb-6">
           <GradeRankingPanel
             rankings={filteredRankings}
@@ -516,9 +626,10 @@ export default function Index() {
             forkMap={forkMap}
             adminWallet={adminWalletForDuel || null}
             roundId={effectiveRound}
+            duelTrackId={roundTracks.length > 0 ? trackFilter : undefined}
             showDuelPanel={true}
             onReauditDone={() => {
-              void fetchRankingsAPI(roundQ).then(setRankings).catch(() => {});
+              void fetchRankingsAPI(roundQ, rankingTrackForAPI).then(setRankings).catch(() => {});
             }}
           />
         </div>
@@ -666,6 +777,7 @@ export default function Index() {
                 key={r.id}
                 fileName={r.fileName}
                 avgScore={r.avgScore}
+                rubricRawMax={r.rubricRawMax}
                 statusText={r.statusText}
                 reports={r.reports}
                 error={r.error}

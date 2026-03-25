@@ -52,7 +52,22 @@ func duelBracketSnapshotSortKey(entryName string, mod time.Time) int64 {
 	return mod.UnixNano()
 }
 
-func latestDuelBracketSnapshotPath(roundID string) (string, error) {
+func readDuelSnapshotTrackID(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var m struct {
+		TrackID string `json:"trackId"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return ""
+	}
+	return strings.TrimSpace(m.TrackID)
+}
+
+// trackQueryResolved 已由 resolveRankingTrackQuery 规范化；空串表示「未按赛道筛选」。
+func latestDuelBracketSnapshotPath(roundID, trackQueryResolved string) (string, error) {
 	dir := submissionRoundDirFor(roundID)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -61,6 +76,7 @@ func latestDuelBracketSnapshotPath(roundID string) (string, error) {
 		}
 		return "", err
 	}
+	hasTracks := RoundHasConfiguredTracks(roundID)
 	var bestPath string
 	var bestKey int64 = -1
 	for _, e := range entries {
@@ -71,6 +87,17 @@ func latestDuelBracketSnapshotPath(roundID string) (string, error) {
 		st, err := os.Stat(p)
 		if err != nil {
 			continue
+		}
+		tid := readDuelSnapshotTrackID(p)
+		if hasTracks && trackQueryResolved != "" {
+			if tid != trackQueryResolved {
+				continue
+			}
+		} else if hasTracks && trackQueryResolved == "" {
+			// 未传 track：仅兼容旧版「全场一条」存证（无 trackId）
+			if tid != "" {
+				continue
+			}
 		}
 		k := duelBracketSnapshotSortKey(e.Name(), st.ModTime())
 		if k > bestKey {
@@ -84,14 +111,24 @@ func latestDuelBracketSnapshotPath(roundID string) (string, error) {
 	return bestPath, nil
 }
 
-// GET /api/duel-bracket-snapshot?round_id= — 公开读取，供排名页同步服务端擂台结果
+// GET /api/duel-bracket-snapshot?round_id=&track_id= — 公开读取；多赛道时每赛道独立存证
 func getDuelBracketSnapshot(c *gin.Context) {
 	roundID, err := sanitizeRoundIDOrDefault(c.Query("round_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 round_id"})
 		return
 	}
-	p, err := latestDuelBracketSnapshotPath(roundID)
+	trackRaw := strings.TrimSpace(c.Query("track_id"))
+	var trackResolved string
+	if trackRaw != "" {
+		var terr error
+		trackResolved, terr = resolveRankingTrackQuery(roundID, trackRaw)
+		if terr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 track_id"})
+			return
+		}
+	}
+	p, err := latestDuelBracketSnapshotPath(roundID, trackResolved)
 	if err != nil {
 		if os.IsNotExist(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -128,12 +165,20 @@ func putDuelBracketSnapshot(c *gin.Context) {
 		SavedAt         string          `json:"savedAt"`
 		PoolTier        string          `json:"poolTier"`
 		RoundID         string          `json:"roundId"`
+		TrackID         string          `json:"trackId"`
 		RankedFileNames []string        `json:"rankedFileNames"`
 		Matches         json.RawMessage `json:"matches"`
 	}
 	if json.Unmarshal(raw, &check) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "非法 JSON"})
 		return
+	}
+	if RoundHasConfiguredTracks(roundID) {
+		tid, err := sanitizeRoundTrackID(check.TrackID)
+		if err != nil || !validRoundTrackID(roundID, tid) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "本场已配置赛道：JSON 须有合法 trackId"})
+			return
+		}
 	}
 	if check.PoolTier != "S" && check.PoolTier != "A" && check.PoolTier != "B" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "poolTier 须为 S/A/B"})
@@ -165,12 +210,22 @@ func putDuelBracketSnapshot(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true, "path": filepath.Base(p)})
 }
 
-// DELETE /api/duel-bracket-snapshot?round_id= — 删除该轮次全部擂台存证（旧单文件 + 所有时间戳文件）
+// DELETE /api/duel-bracket-snapshot?round_id=&track_id= — 未传 track_id 时删除该轮全部擂台存证；传 track_id 时仅删该赛道
 func deleteDuelBracketSnapshot(c *gin.Context) {
 	roundID, err := sanitizeRoundIDOrDefault(c.Query("round_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 round_id"})
 		return
+	}
+	trackRaw := strings.TrimSpace(c.Query("track_id"))
+	var trackResolved string
+	if trackRaw != "" {
+		var terr error
+		trackResolved, terr = resolveRankingTrackQuery(roundID, trackRaw)
+		if terr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 track_id"})
+			return
+		}
 	}
 	dir := submissionRoundDirFor(roundID)
 	entries, err := os.ReadDir(dir)
@@ -187,7 +242,13 @@ func deleteDuelBracketSnapshot(c *gin.Context) {
 		if e.IsDir() || !isDuelBracketSnapshotEntry(e.Name()) {
 			continue
 		}
-		if err := os.Remove(filepath.Join(dir, e.Name())); err != nil && !os.IsNotExist(err) {
+		p := filepath.Join(dir, e.Name())
+		if trackResolved != "" {
+			if readDuelSnapshotTrackID(p) != trackResolved {
+				continue
+			}
+		}
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
 			delErr = err
 		}
 	}

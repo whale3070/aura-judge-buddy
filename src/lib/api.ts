@@ -1,12 +1,11 @@
-import { API_BASE, withRoundQuery, AURA_ROUND_ID, effectiveRoundIdFromSearchParam } from "./apiClient";
-
-const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || "ffkmvdvpewsgenaxeouu";
+import { API_BASE, withRoundQuery, AURA_ROUND_ID } from "./apiClient";
 
 export interface AuditReport {
   model_name: string;
   content: string;
   score?: number;
   error?: string;
+  rubric_raw_max?: number;
 }
 
 export interface AuditResponse {
@@ -17,6 +16,7 @@ export interface AuditResponse {
 export interface RankingItem {
   file_name: string;
   avg_score: number;
+  rubric_raw_max?: number;
   timestamp: string;
   reports?: AuditReport[];
   github_url?: string;
@@ -29,6 +29,7 @@ export interface RankingItem {
 export interface JudgeResult {
   file_name: string;
   avg_score: number;
+  rubric_raw_max?: number;
   timestamp: string;
   reports: AuditReport[];
 }
@@ -55,6 +56,8 @@ export interface SubmissionItem {
   github_repo_is_fork?: boolean;
   /** GitHub 仓库 owner 类型：user | organization */
   github_repo_owner_type?: string;
+  /** 参赛赛道 id（与 submission.form.track 一致，管理台可修改） */
+  track?: string;
 }
 
 export type BuilderFilter = "all" | "beginner" | "longterm" | "org";
@@ -185,17 +188,39 @@ export async function fetchSubmissions(
   return res.json();
 }
 
+/** 与 apiClient.fetchFileTitlesAPI 一致：直连 Aura 后端的 /api/file-project-titles（不再依赖 Supabase Edge file-titles）。 */
 export async function fetchFileTitles(queryRoundId?: string | null): Promise<Record<string, string>> {
   try {
-    const rid = effectiveRoundIdFromSearchParam(queryRoundId);
-    const q = rid ? `?round_id=${encodeURIComponent(rid)}` : "";
-    const url = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/file-titles${q}`;
-    const res = await fetch(url);
+    const res = await fetch(`${API_BASE}${withRoundQuery("/api/file-project-titles", queryRoundId)}`);
     if (!res.ok) return {};
-    return res.json();
+    const data = await res.json();
+    return data && typeof data === "object" ? data : {};
   } catch {
     return {};
   }
+}
+
+/** 管理台：为提交设置赛道（写入 submission.json），便于排行按 ?track= 筛选 */
+export async function updateSubmissionTrack(
+  id: string,
+  track: string,
+  adminWallet: string,
+  queryRoundId?: string | null
+): Promise<{ track: string }> {
+  const path = withRoundQuery(`/api/submission/${encodeURIComponent(id)}/track`, queryRoundId);
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Wallet": adminWallet,
+    },
+    body: JSON.stringify({ track }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "保存赛道失败" }));
+    throw new Error(err.error || err.message || "保存赛道失败");
+  }
+  return res.json();
 }
 
 export async function deleteSubmission(

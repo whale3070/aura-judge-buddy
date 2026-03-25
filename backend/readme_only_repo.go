@@ -9,7 +9,10 @@ import (
 
 const readmeOnlyMarkerFile = ".aura_readme_only_repo"
 
-var readmeOnlyWordFileRE = regexp.MustCompile(`^([0-9]+)_00_README\.md$`)
+// 与 rebuild_backend submissionIDOK 一致：纯数字 id，或 数字_十六进制（如 1774…_8283519bc1c3）
+var readmeOnlyWordFileRE = regexp.MustCompile(
+	`^((?:[0-9]+_[a-zA-Z0-9]+|[0-9]+))_00_README\.md$`,
+)
 
 var skipRepoSubdirs = map[string]bool{
 	".git": true, "node_modules": true, "vendor": true, "dist": true,

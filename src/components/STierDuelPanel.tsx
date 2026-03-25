@@ -17,6 +17,7 @@ import {
 } from "@/lib/duelBracketStorage";
 import { putDuelBracketSnapshotToServer, syncDuelBracketFromServer } from "@/lib/duelBracketRemote";
 import { toast } from "sonner";
+import { formatPrimaryScoreLabel, scoreNorm100 } from "@/lib/scoreNorm";
 
 export interface DuelProjectOption {
   file_name: string;
@@ -32,6 +33,7 @@ export interface DuelCandidate extends DuelProjectOption {
   tier: DuelPoolTier;
   /** 五维评审均分：展示参考；与同档 PK 胜场持平时决擂台代表 */
   avg_score: number;
+  rubric_raw_max?: number;
 }
 
 type DuelMode = "manual" | "auto";
@@ -66,6 +68,8 @@ interface Props {
   enabled: boolean;
   /** 与 ?round_id= 一致，POST /api/duel 时带上 */
   roundId?: string | null;
+  /** 与 ?track= 一致；多赛道时擂台存证按赛道隔离 */
+  duelTrackId?: string | null;
 }
 
 /** 与 ReportCard 评审正文一致：typography + 暗色可读 */
@@ -106,7 +110,9 @@ type RrTierBoard = { tier: DuelPoolTier; rows: RrBoardRow[] };
 function strongestInTier(pool: DuelCandidate[]): DuelCandidate | null {
   if (pool.length === 0) return null;
   return [...pool].sort((a, b) => {
-    if (b.avg_score !== a.avg_score) return b.avg_score - a.avg_score;
+    const na = scoreNorm100(a.avg_score, a.rubric_raw_max);
+    const nb = scoreNorm100(b.avg_score, b.rubric_raw_max);
+    if (nb !== na) return nb - na;
     return a.file_name.localeCompare(b.file_name);
   })[0]!;
 }
@@ -146,7 +152,9 @@ function pickPkLeaderFromMatches(
     const wa = wins.get(a.file_name) ?? 0;
     const wb = wins.get(b.file_name) ?? 0;
     if (wb !== wa) return wb - wa;
-    if (b.avg_score !== a.avg_score) return b.avg_score - a.avg_score;
+    const na = scoreNorm100(a.avg_score, a.rubric_raw_max);
+    const nb = scoreNorm100(b.avg_score, b.rubric_raw_max);
+    if (nb !== na) return nb - na;
     return a.file_name.localeCompare(b.file_name);
   })[0]!;
 }
@@ -161,11 +169,11 @@ function persistManualDuelSnapshot(
   fileB: string,
   res: DuelResponse,
   poolProjects: DuelProjectOption[],
-  adminWallet: string
+  adminWallet: string,
+  duelTrackId?: string | null
 ): void {
   const wf = parseDuelWinnerFile(res, fileA, fileB);
   if (!wf) return;
-  const loser = wf === fileA ? fileB : fileA;
   const rid = (roundId ?? "").trim();
   if (!rid || !adminWallet) return;
 
@@ -173,11 +181,13 @@ function persistManualDuelSnapshot(
   const titleB = poolProjects.find((p) => p.file_name === fileB)?.title ?? fileB;
   const winnerLabel = wf === fileA ? titleA : titleB;
 
-  const existing = loadDuelBracketSnapshot(rid);
+  const tid = (duelTrackId ?? "").trim();
+  const existing = loadDuelBracketSnapshot(rid, tid || undefined);
   const canMerge =
     existing &&
     existing.poolTier === poolTier &&
-    (existing.roundId ?? "").trim() === rid;
+    (existing.roundId ?? "").trim() === rid &&
+    (existing.trackId ?? "").trim() === tid;
 
   const nextRound =
     canMerge && existing.matches.length > 0
@@ -216,6 +226,7 @@ function persistManualDuelSnapshot(
   const saved = saveDuelBracketSnapshot({
     poolTier,
     roundId: rid,
+    ...(tid ? { trackId: tid } : {}),
     arenaFormat: arenaFmt,
     rankedFileNames,
     matches,
@@ -230,7 +241,7 @@ function persistManualDuelSnapshot(
   }
 }
 
-export default function STierDuelPanel({ candidates, adminWallet, enabled, roundId }: Props) {
+export default function STierDuelPanel({ candidates, adminWallet, enabled, roundId, duelTrackId }: Props) {
   const [poolTier, setPoolTier] = useState<DuelPoolTier>("S");
   const [duelMode, setDuelMode] = useState<DuelMode>("manual");
   /** 自动模式：从哪一档开始跑「同档完整单循环」（其下档不跑单循环，省 token） */
@@ -276,8 +287,8 @@ export default function STierDuelPanel({ candidates, adminWallet, enabled, round
   useEffect(() => {
     const rid = (roundId ?? "").trim();
     if (!rid) return;
-    void syncDuelBracketFromServer(rid);
-  }, [roundId]);
+    void syncDuelBracketFromServer(rid, (duelTrackId ?? "").trim() || undefined);
+  }, [roundId, duelTrackId]);
 
   useEffect(() => {
     return () => {
@@ -330,7 +341,7 @@ export default function STierDuelPanel({ candidates, adminWallet, enabled, round
         round_id: roundId ?? undefined,
       });
       setResult(res);
-      persistManualDuelSnapshot(poolTier, roundId, fileA, fileB, res, poolProjects, adminWallet);
+      persistManualDuelSnapshot(poolTier, roundId, fileA, fileB, res, poolProjects, adminWallet, duelTrackId);
     } catch (e: unknown) {
       if (e instanceof Error && e.name === "AbortError") return;
       setErr(e instanceof Error ? e.message : "对决失败");
@@ -661,9 +672,11 @@ export default function STierDuelPanel({ candidates, adminWallet, enabled, round
         otherPoolTiers[t] = tierSliceMap.get(t)!;
       }
       const rid = (roundId ?? "").trim();
+      const tid = (duelTrackId ?? "").trim();
       const saved = saveDuelBracketSnapshot({
         poolTier: primaryTier,
         roundId: rid,
+        ...(tid ? { trackId: tid } : {}),
         arenaFormat: primarySlice.arenaFormat,
         rankedFileNames: primarySlice.rankedFileNames,
         matches: stored,
@@ -710,6 +723,11 @@ export default function STierDuelPanel({ candidates, adminWallet, enabled, round
     <div className="border border-primary/30 bg-primary/5 p-4 space-y-4 mb-6">
       <div>
         <h3 className="text-sm font-bold text-primary tracking-wide">擂台 · AI 两两评比</h3>
+        {(duelTrackId ?? "").trim() ? (
+          <p className="text-[11px] text-accent/90 mt-0.5 font-mono">
+            track_id={(duelTrackId ?? "").trim()}（与同页排名列表口径一致，与其它赛道擂台互不干扰）
+          </p>
+        ) : null}
         <p className="text-xs text-muted-foreground mt-1">
           使用两份 README 全文，按<strong className="text-foreground/80"> 创新性 / 技术实现 / 商业价值 / 用户体验 / 落地可行性 </strong>
           五维逐维对比；<strong className="text-foreground/80">至少赢得 3 个维度</strong>者为本场胜者（胜 +1 PK 分，负 0）。模型输出末尾含机器可读行。
@@ -839,7 +857,8 @@ export default function STierDuelPanel({ candidates, adminWallet, enabled, round
                       </span>
                       {strong && (
                         <span className="text-[9px] text-foreground/70 line-clamp-2" title={strong.title}>
-                          五维均分领先：{strong.title} ({strong.avg_score.toFixed(2)})
+                          五维均分领先：{strong.title}（
+                          {formatPrimaryScoreLabel(strong.avg_score, strong.rubric_raw_max)}）
                         </span>
                       )}
                     </li>

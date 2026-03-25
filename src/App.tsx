@@ -13,6 +13,7 @@ import MySubmission from "./pages/MySubmission";
 import RoundList from "./pages/RoundList";
 import RoundForm from "./pages/RoundForm";
 import RoundDetail from "./pages/RoundDetail";
+import RoundTracks from "./pages/RoundTracks";
 import JudgeWorkspace from "./pages/JudgeWorkspace";
 import RulesManagement from "./pages/RulesManagement";
 import NotFound from "./pages/NotFound";
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/rounds" element={<RoundList />} />
             <Route path="/rounds/new" element={<RoundForm />} />
             <Route path="/rounds/:id" element={<RoundDetail />} />
+            <Route path="/rounds/:id/tracks" element={<RoundTracks />} />
             <Route path="/rounds/:id/judge/:judgeId" element={<JudgeWorkspace />} />
             <Route path="/rounds/:id/edit" element={<RoundForm />} />
             <Route path="/rules" element={<RulesManagement />} />

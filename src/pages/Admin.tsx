@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   fetchRankings,
@@ -6,11 +6,12 @@ import {
   fetchAdminConfig,
   fetchFileTitles,
   deleteSubmission,
+  updateSubmissionTrack,
   type RankingItem,
   type SubmissionItem,
   type BuilderFilter,
 } from "@/lib/api";
-import { effectiveRoundIdFromSearchParam, roundNavSuffix } from "@/lib/apiClient";
+import { fetchRoundTracksAPI, effectiveRoundIdFromSearchParam, roundNavSuffix, type RoundTrackEntry } from "@/lib/apiClient";
 import { toast } from "sonner";
 import JudgeDetail from "@/components/JudgeDetail";
 import GradeRankingPanel from "@/components/GradeRankingPanel";
@@ -20,6 +21,7 @@ import { useWallet } from "@/hooks/useWallet";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
 import { letterTierFromReports, type LetterTier } from "@/lib/dimensionTier";
 import { githubRepoDisplayName } from "@/lib/utils";
+import { compareRankingScoreDesc } from "@/lib/scoreNorm";
 
 const TIER_RANK: Record<LetterTier, number> = { S: 5, A: 4, B: 3, C: 2, D: 1, "?": 0 };
 
@@ -29,7 +31,7 @@ function buildRankingByFileName(rankings: RankingItem[]): Map<string, RankingIte
     const fn = (item.file_name ?? "").trim();
     if (!fn) continue;
     const prev = m.get(fn);
-    if (!prev || item.avg_score > prev.avg_score) {
+    if (!prev || compareRankingScoreDesc(prev, item) > 0) {
       m.set(fn, item);
     }
   }
@@ -161,6 +163,14 @@ export default function Admin() {
     return m;
   }, [submissions]);
 
+  const refreshRankingsAndTitles = useCallback(() => {
+    if (!hashOk) return;
+    Promise.all([fetchRankings(roundQ), fetchFileTitles(roundQ)]).then(([r, t]) => {
+      setRankings(r);
+      setTitleMap(t);
+    });
+  }, [hashOk, roundQ]);
+
   if (configLoading) {
     return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">LOADING...</div>;
   }
@@ -201,7 +211,7 @@ export default function Admin() {
               {t("nav.rounds")}
             </Link>
             <Link
-              to={`/ranking${roundNavSuffix(roundQ)}`}
+              to={effectiveRound ? `/rounds/${encodeURIComponent(effectiveRound)}/tracks` : "/rounds"}
               className="text-xs border border-border px-3 py-1.5 text-muted-foreground hover:text-primary transition-colors"
             >
               {t("nav.tracks")}
@@ -256,6 +266,7 @@ export default function Admin() {
               adminWallet={wallet.address ?? null}
               roundId={effectiveRound}
               showDuelPanel={false}
+              onRankingDataStale={refreshRankingsAndTitles}
             />
           </>
         )}
@@ -299,6 +310,9 @@ export default function Admin() {
                 queryRoundId={roundQ}
                 onDeleted={(delId) => setSubmissions((prev) => prev.filter((s) => s.id !== delId))}
                 canDelete={canViewSubmissions}
+                onTrackSaved={(id, track) =>
+                  setSubmissions((prev) => prev.map((s) => (s.id === id ? { ...s, track } : s)))
+                }
                 onRankingsRefresh={() => {
                   if (!hashOk) return;
                   Promise.all([fetchRankings(roundQ), fetchFileTitles(roundQ)]).then(([r, t]) => {
@@ -352,6 +366,7 @@ function SubmissionsTab({
   onDeleted,
   canDelete = true,
   onRankingsRefresh,
+  onTrackSaved,
 }: {
   rankings: RankingItem[];
   submissions: SubmissionItem[];
@@ -362,12 +377,55 @@ function SubmissionsTab({
   onDeleted: (id: string) => void;
   canDelete?: boolean;
   onRankingsRefresh?: () => void;
+  onTrackSaved?: (id: string, track: string) => void;
 }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [roundTracks, setRoundTracks] = useState<RoundTrackEntry[]>([]);
+  const [trackDraft, setTrackDraft] = useState("");
+  const [savingTrack, setSavingTrack] = useState(false);
+
+  const roundIdForApi = effectiveRoundIdFromSearchParam(queryRoundId);
+
+  useEffect(() => {
+    if (!roundIdForApi) {
+      setRoundTracks([]);
+      return;
+    }
+    let cancelled = false;
+    fetchRoundTracksAPI(roundIdForApi)
+      .then((rows) => {
+        if (!cancelled) setRoundTracks(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setRoundTracks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [roundIdForApi]);
+
+  useEffect(() => {
+    if (!expanded) {
+      setTrackDraft("");
+      return;
+    }
+    const sub = submissions.find((x) => x.id === expanded);
+    setTrackDraft((sub?.track ?? "").trim());
+  }, [expanded, submissions]);
 
   const rankByFile = useMemo(() => buildRankingByFileName(rankings), [rankings]);
+
+  const trackSelectOptions = useMemo(() => {
+    const cur = trackDraft.trim();
+    const byId = new Map(roundTracks.map((tr) => [tr.id, tr] as const));
+    const out: RoundTrackEntry[] = [...roundTracks];
+    if (cur && !byId.has(cur)) {
+      out.unshift({ id: cur, name: `${cur} (${t("admin.trackLegacyCurrent")})` });
+    }
+    return out;
+  }, [roundTracks, trackDraft, t]);
 
   const hasRepoURL = (s: SubmissionItem) => Boolean((s.github_url ?? "").trim());
 
@@ -397,11 +455,15 @@ function SubmissionsTab({
 
   /** 后端在配置 GITHUB_TOKEN 后返回 github_account_years；未返回时表示尚未补全。 */
   const accountYearsLabel = (s: SubmissionItem) => {
+    const status = (s.github_enrich_status ?? "").toLowerCase();
+    if (status === "success") {
+      const y = typeof s.github_account_years === "number" && !Number.isNaN(s.github_account_years) ? s.github_account_years : 0;
+      return t("admin.accountYearsValue", { n: String(y) });
+    }
     const years = s.github_account_years;
     if (typeof years === "number" && !Number.isNaN(years)) {
       return t("admin.accountYearsValue", { n: String(years) });
     }
-    const status = (s.github_enrich_status ?? "").toLowerCase();
     if (status) {
       if (status === "rate_limited") return t("admin.accountYearsRateLimited");
       if (status === "unauthorized") return t("admin.accountYearsUnauthorized");
@@ -413,6 +475,20 @@ function SubmissionsTab({
     if (s.github_username) return t("admin.accountYearsFetching");
     if (hasRepoURL(s)) return t("admin.accountYearsRepoNoAge");
     return t("admin.accountYearsNoGitHub");
+  };
+
+  const saveTrackForExpanded = async () => {
+    if (!expanded || !roundIdForApi) return;
+    setSavingTrack(true);
+    try {
+      await updateSubmissionTrack(expanded, trackDraft.trim(), adminWallet, queryRoundId);
+      onTrackSaved?.(expanded, trackDraft.trim());
+      toast.success(t("admin.trackSaved"));
+    } catch (e: any) {
+      toast.error(e?.message || t("admin.trackSaveError"));
+    } finally {
+      setSavingTrack(false);
+    }
   };
 
   const builderTag = (s: SubmissionItem) => {
@@ -508,6 +584,44 @@ function SubmissionsTab({
                   <a href={s.demo_url} target="_blank" rel="noreferrer" className="block text-primary hover:underline truncate">{s.demo_url || "—"}</a>
                 </div>
               </div>
+              {roundIdForApi && roundTracks.length > 0 ? (
+                <div className="border border-primary/25 rounded p-3 bg-muted/30 space-y-2">
+                  <div className="text-xs font-bold text-foreground/90">{t("admin.trackAssignTitle")}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={trackDraft}
+                      onChange={(e) => setTrackDraft(e.target.value)}
+                      className="text-xs border border-border bg-background px-2 py-2 min-w-[200px] max-w-full"
+                    >
+                      <option value="">{t("admin.trackUnassigned")}</option>
+                      {trackSelectOptions.map((tr) => (
+                        <option key={tr.id} value={tr.id}>
+                          {(tr.name ?? "").trim() || tr.id}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={saveTrackForExpanded}
+                      disabled={savingTrack}
+                      className="text-xs border border-primary/50 bg-primary/10 text-primary px-3 py-2 font-bold hover:bg-primary/20 disabled:opacity-50"
+                    >
+                      {savingTrack ? t("admin.trackSaving") : t("admin.trackSave")}
+                    </button>
+                    {trackDraft.trim() !== "" ? (
+                      <Link
+                        to={`/ranking?round_id=${encodeURIComponent(roundIdForApi)}&track=${encodeURIComponent(trackDraft.trim())}`}
+                        className="text-xs border border-border px-3 py-2 text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {t("admin.trackViewRanking")}
+                      </Link>
+                    ) : null}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">{t("admin.trackAssignHint")}</p>
+                </div>
+              ) : roundIdForApi && roundTracks.length === 0 ? (
+                <p className="text-[10px] text-muted-foreground">{t("admin.trackNoConfigHint")}</p>
+              ) : null}
               {s.why_this_chain && (
                 <div>
                   <span className="text-muted-foreground text-xs">{t("admin.legacyFormNote")}</span>

@@ -4,10 +4,13 @@ import type { AuditReport } from "@/lib/apiClient";
 import { useI18n } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import AuditIndeterminateProgress from "@/components/AuditIndeterminateProgress";
+import { formatPrimaryScoreLabel, scoreNorm100 } from "@/lib/scoreNorm";
 
 interface Props {
   fileName: string;
   avgScore: number | null;
+  /** 与 SavedResult.rubric_raw_max 一致；有则 avgScore 为原始分总和 */
+  rubricRawMax?: number;
   statusText: string;
   reports: AuditReport[];
   error?: string;
@@ -21,14 +24,14 @@ interface Props {
   projectKeywords?: string[];
 }
 
-function scorePillClass(avg: number | null) {
-  if (avg === null) return "bg-muted-foreground/60 text-primary-foreground border-muted-foreground/20";
-  if (avg >= 80) return "bg-primary text-primary-foreground border-primary/40 shadow-[0_0_10px_hsl(var(--primary)/0.4)]";
-  if (avg < 60) return "bg-destructive text-destructive-foreground border-destructive/40 shadow-[0_0_10px_hsl(var(--destructive)/0.3)]";
+function scorePillClass(normPct: number | null) {
+  if (normPct === null) return "bg-muted-foreground/60 text-primary-foreground border-muted-foreground/20";
+  if (normPct >= 80) return "bg-primary text-primary-foreground border-primary/40 shadow-[0_0_10px_hsl(var(--primary)/0.4)]";
+  if (normPct < 60) return "bg-destructive text-destructive-foreground border-destructive/40 shadow-[0_0_10px_hsl(var(--destructive)/0.3)]";
   return "bg-warning text-warning-foreground border-warning/40 shadow-[0_0_10px_hsl(var(--warning)/0.3)]";
 }
 
-export default function ReportCard({ fileName, avgScore, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256, enableWebSearch, outputLang, searchQuery, competitorResultsCount, projectKeywords }: Props) {
+export default function ReportCard({ fileName, avgScore, rubricRawMax, statusText, reports, error, defaultOpen = false, ruleVersionId, ruleSha256, enableWebSearch, outputLang, searchQuery, competitorResultsCount, projectKeywords }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
   const [showSearchQuery, setShowSearchQuery] = useState(false);
@@ -72,8 +75,8 @@ export default function ReportCard({ fileName, avgScore, statusText, reports, er
             </Badge>
           )}
         </div>
-        <div className={`px-2.5 py-0.5 text-sm font-bold border whitespace-nowrap ${scorePillClass(avgScore)}`}>
-          {avgScore === null ? "N/A" : avgScore}
+        <div className={`px-2.5 py-0.5 text-sm font-bold border whitespace-nowrap ${scorePillClass(avgScore === null ? null : scoreNorm100(avgScore, rubricRawMax))}`}>
+          {avgScore === null ? "N/A" : formatPrimaryScoreLabel(avgScore, rubricRawMax)}
         </div>
       </button>
 

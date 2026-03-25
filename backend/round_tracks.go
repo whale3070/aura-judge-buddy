@@ -31,6 +31,8 @@ type RoundTrackEntry struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	PrizePool   string `json:"prize_pool,omitempty"`
+	// RankingCount 仅 GET/PUT 响应中由服务端填入：该赛道下与 /api/ranking?track= 一致的排名行数；不入库 .aura_tracks.json
+	RankingCount int `json:"ranking_count"`
 }
 
 type auraTracksFile struct {
@@ -91,7 +93,7 @@ func getRoundTracksHTTP(c *gin.Context) {
 	if f.Tracks == nil {
 		f.Tracks = []RoundTrackEntry{}
 	}
-	c.JSON(http.StatusOK, gin.H{"tracks": f.Tracks})
+	c.JSON(http.StatusOK, gin.H{"tracks": attachRankingCountsToTracks(rid, f.Tracks)})
 }
 
 type putRoundTracksBody struct {
@@ -137,7 +139,7 @@ func putRoundTracksHTTP(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存失败"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"tracks": out})
+	c.JSON(http.StatusOK, gin.H{"tracks": attachRankingCountsToTracks(rid, out)})
 }
 
 // ValidRoundTrackID 返回 true 当且仅当 id 在轮次 .aura_tracks.json 中存在（用于提交校验）

@@ -46,6 +46,7 @@ export default function RuleDetailView({ version, onBack }: Props) {
                   <th className="py-2 px-3">Key</th>
                   <th className="py-2 px-3">{t("rules.dimName")}</th>
                   <th className="py-2 px-3">{t("rules.dimWeight")}</th>
+                  <th className="py-2 px-3">Max</th>
                   <th className="py-2 px-3">{t("rules.dimDesc")}</th>
                 </tr>
               </thead>
@@ -55,6 +56,7 @@ export default function RuleDetailView({ version, onBack }: Props) {
                     <td className="py-2.5 px-3 font-mono text-xs text-muted-foreground">{d.key}</td>
                     <td className="py-2.5 px-3 font-medium text-foreground">{d.name}</td>
                     <td className="py-2.5 px-3"><span className="text-primary font-bold">{d.weight}%</span></td>
+                    <td className="py-2.5 px-3 font-mono text-xs">{d.max ?? "—"}</td>
                     <td className="py-2.5 px-3 text-muted-foreground text-xs">{d.description}</td>
                   </tr>
                 ))}
@@ -63,6 +65,7 @@ export default function RuleDetailView({ version, onBack }: Props) {
                 <tr className="border-t border-border">
                   <td className="py-2 px-3" colSpan={2}></td>
                   <td className="py-2 px-3 font-bold text-foreground">{r.dimensions.reduce((s, d) => s + d.weight, 0)}%</td>
+                  <td></td>
                   <td></td>
                 </tr>
               </tfoot>

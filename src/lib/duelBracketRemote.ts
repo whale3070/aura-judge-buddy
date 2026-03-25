@@ -1,6 +1,6 @@
 import { API_BASE, withRoundQuery } from "@/lib/apiClient";
 import {
-  DUEL_BRACKET_STORAGE_KEY,
+  duelBracketLocalStorageKey,
   loadDuelBracketSnapshot,
   type DuelBracketSnapshot,
 } from "@/lib/duelBracketStorage";
@@ -15,12 +15,22 @@ function notifyDuelSnapshotUpdated(): void {
   }
 }
 
-export async function fetchDuelBracketSnapshotFromServer(roundId: string): Promise<DuelBracketSnapshot | null> {
+function withTrackOnPath(path: string, trackId?: string | null): string {
+  const t = (trackId ?? "").trim();
+  if (!t) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}track_id=${encodeURIComponent(t)}`;
+}
+
+export async function fetchDuelBracketSnapshotFromServer(
+  roundId: string,
+  trackId?: string | null
+): Promise<DuelBracketSnapshot | null> {
   const rid = roundId.trim();
   if (!rid) return null;
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${withRoundQuery("/api/duel-bracket-snapshot", rid)}`);
+    const path = withTrackOnPath(withRoundQuery("/api/duel-bracket-snapshot", rid), trackId);
+    res = await fetch(`${API_BASE}${path}`);
   } catch {
     return null;
   }
@@ -38,17 +48,20 @@ export async function fetchDuelBracketSnapshotFromServer(roundId: string): Promi
 }
 
 /** 若服务端快照更新则不覆盖较新的本地数据；写入后派发 aura-duel-snapshot-updated */
-export async function syncDuelBracketFromServer(roundId: string): Promise<void> {
+export async function syncDuelBracketFromServer(roundId: string, trackId?: string | null): Promise<void> {
   const rid = roundId.trim();
   if (!rid) return;
-  const server = await fetchDuelBracketSnapshotFromServer(rid);
+  const tid = (trackId ?? "").trim();
+  const server = await fetchDuelBracketSnapshotFromServer(rid, tid || undefined);
   if (!server) return;
-  const local = loadDuelBracketSnapshot(rid);
+  const local = loadDuelBracketSnapshot(rid, tid || undefined);
   const serverT = Date.parse(server.savedAt || "") || 0;
   const localT = local ? Date.parse(local.savedAt || "") || 0 : 0;
   if (!local || serverT >= localT) {
     try {
-      localStorage.setItem(DUEL_BRACKET_STORAGE_KEY, JSON.stringify(server));
+      const st = (server.trackId ?? "").trim() || tid;
+      const key = duelBracketLocalStorageKey(rid, st || null);
+      localStorage.setItem(key, JSON.stringify(server));
       notifyDuelSnapshotUpdated();
     } catch {
       /* quota / private mode */
@@ -63,7 +76,8 @@ export async function putDuelBracketSnapshotToServer(
 ): Promise<void> {
   const rid = roundId.trim();
   if (!rid) throw new Error("round_id required");
-  const res = await fetch(`${API_BASE}${withRoundQuery("/api/duel-bracket-snapshot", rid)}`, {
+  const path = withTrackOnPath(withRoundQuery("/api/duel-bracket-snapshot", rid), snap.trackId ?? null);
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -77,10 +91,15 @@ export async function putDuelBracketSnapshotToServer(
   }
 }
 
-export async function deleteDuelBracketSnapshotFromServer(adminWallet: string, roundId: string): Promise<void> {
+export async function deleteDuelBracketSnapshotFromServer(
+  adminWallet: string,
+  roundId: string,
+  trackId?: string | null
+): Promise<void> {
   const rid = roundId.trim();
   if (!rid) return;
-  const res = await fetch(`${API_BASE}${withRoundQuery("/api/duel-bracket-snapshot", rid)}`, {
+  const path = withTrackOnPath(withRoundQuery("/api/duel-bracket-snapshot", rid), trackId);
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "DELETE",
     headers: { "X-Admin-Wallet": adminWallet },
   });

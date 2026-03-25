@@ -3,6 +3,9 @@ import type { RankingItem } from "@/lib/api";
 import JudgeDetail from "@/components/JudgeDetail";
 import STierDuelPanel from "@/components/STierDuelPanel";
 import { letterTierFromReports, type LetterTier } from "@/lib/dimensionTier";
+import { fetchActiveRulesAPI } from "@/lib/apiClient";
+import { parseAndValidateYAML, type RuleSet } from "@/lib/rulesApi";
+import { inferJudgeRubricMode, tierFoldHeadline, type JudgeRubricMode } from "@/lib/judgeRubricDisplay";
 import { syncDuelBracketFromServer } from "@/lib/duelBracketRemote";
 import {
   loadDuelBracketSnapshot,
@@ -11,6 +14,7 @@ import {
   tierHasBracketEvidence,
 } from "@/lib/duelBracketStorage";
 import { rankingItemDisplayLabel } from "@/lib/utils";
+import { compareRankingScoreDesc, formatPrimaryScoreLabel } from "@/lib/scoreNorm";
 
 interface TierConfig {
   tier: LetterTier;
@@ -24,7 +28,59 @@ interface TierConfig {
 
 const TIER_ORDER: LetterTier[] = ["S", "A", "B", "C", "D", "?"];
 
-const TIER_META: Record<LetterTier, Omit<TierConfig, "tier">> = {
+/** 四维 0–10 阶梯（与 dimensionTier / 规则 YAML notes 一致） */
+const TIER_META_FOUR: Record<LetterTier, Omit<TierConfig, "tier">> = {
+  S: {
+    label: "S",
+    desc: "≥4 维 ≥9（满分 10，阶梯互斥）",
+    color: "text-primary",
+    bgClass: "bg-primary/10",
+    borderClass: "border-primary/40",
+    glowClass: "shadow-[0_0_15px_hsl(var(--primary)/0.3)]",
+  },
+  A: {
+    label: "A",
+    desc: "≥3 维 ≥8",
+    color: "text-secondary",
+    bgClass: "bg-secondary/10",
+    borderClass: "border-secondary/40",
+    glowClass: "shadow-[0_0_15px_hsl(var(--secondary)/0.3)]",
+  },
+  B: {
+    label: "B",
+    desc: "≥2 维 ≥7",
+    color: "text-warning",
+    bgClass: "bg-[hsl(var(--warning)/0.1)]",
+    borderClass: "border-[hsl(var(--warning)/0.4)]",
+    glowClass: "shadow-[0_0_15px_hsl(var(--warning)/0.2)]",
+  },
+  C: {
+    label: "C",
+    desc: "≥1 维 ≥6",
+    color: "text-orange-400",
+    bgClass: "bg-orange-500/10",
+    borderClass: "border-orange-500/30",
+    glowClass: "shadow-[0_0_12px_rgba(251,146,60,0.15)]",
+  },
+  D: {
+    label: "D",
+    desc: "四维均 ＜6",
+    color: "text-destructive",
+    bgClass: "bg-destructive/10",
+    borderClass: "border-destructive/40",
+    glowClass: "shadow-[0_0_15px_hsl(var(--destructive)/0.2)]",
+  },
+  "?": {
+    label: "?",
+    desc: "缺少完整四维（满分 10）解析，请检查评审输出是否与 YAML 维度名一致",
+    color: "text-muted-foreground",
+    bgClass: "bg-muted/30",
+    borderClass: "border-border",
+    glowClass: "",
+  },
+};
+
+const TIER_META_FIVE: Record<LetterTier, Omit<TierConfig, "tier">> = {
   S: {
     label: "S",
     desc: "≥4 维 ≥18（满分 20，阶梯互斥）",
@@ -75,6 +131,26 @@ const TIER_META: Record<LetterTier, Omit<TierConfig, "tier">> = {
   },
 };
 
+function tierMetaForMode(mode: JudgeRubricMode): Record<LetterTier, Omit<TierConfig, "tier">> {
+  if (mode === "four10") return TIER_META_FOUR;
+  if (mode === "five20") return TIER_META_FIVE;
+  const base = TIER_META_FIVE;
+  const genericDesc =
+    "档位由当前激活规则（/rules）中 notes 的阶梯互斥规则确定；avg_score 为加权总分 0–100";
+  const out = {} as Record<LetterTier, Omit<TierConfig, "tier">>;
+  for (const k of TIER_ORDER) {
+    if (k === "?") {
+      out[k] = {
+        ...base["?"],
+        desc: "无法解析完整维度分数，或规则为自定义维度集，请对照 /rules 与评审正文",
+      };
+    } else {
+      out[k] = { ...base[k], desc: genericDesc };
+    }
+  }
+  return out;
+}
+
 interface MergedProject {
   key: string;
   item: RankingItem;
@@ -82,7 +158,11 @@ interface MergedProject {
   tier: LetterTier;
 }
 
-type MergedArenaRow = MergedProject & { file_name: string; avg_score: number };
+type MergedArenaRow = MergedProject & {
+  file_name: string;
+  avg_score: number;
+  rubric_raw_max?: number;
+};
 
 interface Props {
   rankings: RankingItem[];
@@ -97,6 +177,10 @@ interface Props {
   /** 是否展示“擂台 · AI 两两评比（同档位内）” */
   showDuelPanel?: boolean;
   onReauditDone?: () => void;
+  /** 展开详情的裁决存证缺失时刷新排名列表（例如提交已删） */
+  onRankingDataStale?: () => void;
+  /** 与 /judge?track= 一致；多赛道时擂台按赛道隔离 */
+  duelTrackId?: string | null;
 }
 
 export default function GradeRankingPanel({
@@ -108,16 +192,45 @@ export default function GradeRankingPanel({
   roundId,
   showDuelPanel = true,
   onReauditDone,
+  onRankingDataStale,
+  duelTrackId,
 }: Props) {
   const [expandedTier, setExpandedTier] = useState<LetterTier | null>("S");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [snapEpoch, setSnapEpoch] = useState(0);
+  const [activeRuleSet, setActiveRuleSet] = useState<RuleSet | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchActiveRulesAPI()
+      .then((res) => {
+        if (cancelled || !res.rawYAML) {
+          if (!cancelled) setActiveRuleSet(null);
+          return;
+        }
+        const { parsed } = parseAndValidateYAML(res.rawYAML);
+        if (!cancelled) setActiveRuleSet(parsed);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveRuleSet(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rubricMode = useMemo(() => inferJudgeRubricMode(activeRuleSet), [activeRuleSet]);
+  const tierMeta = useMemo(() => tierMetaForMode(rubricMode), [rubricMode]);
+  const foldHeadline = useMemo(
+    () => tierFoldHeadline(rubricMode, activeRuleSet?.dimensions?.length ?? 0),
+    [rubricMode, activeRuleSet?.dimensions?.length]
+  );
 
   useEffect(() => {
     const rid = (roundId ?? "").trim();
     if (!rid) return;
-    void syncDuelBracketFromServer(rid);
-  }, [roundId]);
+    void syncDuelBracketFromServer(rid, (duelTrackId ?? "").trim() || undefined);
+  }, [roundId, duelTrackId]);
 
   useEffect(() => {
     const bump = () => setSnapEpoch((e) => e + 1);
@@ -126,8 +239,8 @@ export default function GradeRankingPanel({
   }, []);
 
   const duelSnap = useMemo(
-    () => loadDuelBracketSnapshot(roundId ?? undefined),
-    [roundId, snapEpoch]
+    () => loadDuelBracketSnapshot(roundId ?? undefined, (duelTrackId ?? "").trim() || undefined),
+    [roundId, duelTrackId, snapEpoch]
   );
 
   const mergedProjects = useMemo(() => {
@@ -136,7 +249,7 @@ export default function GradeRankingPanel({
       const title = rankingItemDisplayLabel(item, titleMap, {});
       const tier = letterTierFromReports(item.reports);
       const existing = projectMap.get(title);
-      if (!existing || item.avg_score > existing.item.avg_score) {
+      if (!existing || compareRankingScoreDesc(existing.item, item) > 0) {
         projectMap.set(title, { key: title, item, title, tier });
       }
     }
@@ -172,13 +285,14 @@ export default function GradeRankingPanel({
           ...p,
           file_name: p.item.file_name,
           avg_score: p.item.avg_score,
+          rubric_raw_max: p.item.rubric_raw_max,
         }));
         const sorted = sortArenaTierItems(rows, t, duelSnap, true, aliasSelf, (r) =>
           r.title.toLowerCase()
         );
         groups[t] = sorted.map(({ file_name: _f, avg_score: _a, ...rest }) => rest);
       } else {
-        groups[t].sort((a, b) => b.item.avg_score - a.item.avg_score);
+        groups[t].sort((a, b) => compareRankingScoreDesc(b.item, a.item));
       }
     }
     return groups;
@@ -193,6 +307,7 @@ export default function GradeRankingPanel({
           title: p.title,
           tier: p.tier as "S" | "A" | "B",
           avg_score: p.item.avg_score,
+          rubric_raw_max: p.item.rubric_raw_max,
         })),
     [mergedProjects]
   );
@@ -212,7 +327,7 @@ export default function GradeRankingPanel({
     <div className="space-y-4">
       <div className="flex gap-3 flex-wrap mb-2">
         {TIER_ORDER.map((tier) => {
-          const meta = TIER_META[tier];
+          const meta = tierMeta[tier];
           return (
             <div
               key={tier}
@@ -234,12 +349,13 @@ export default function GradeRankingPanel({
           adminWallet={adminWallet ?? ""}
           enabled={duelEnabled}
           roundId={roundId}
+          duelTrackId={duelTrackId}
         />
       )}
 
       {TIER_ORDER.map((tier) => {
         const projects = tierGroups[tier];
-        const meta = TIER_META[tier];
+        const meta = tierMeta[tier];
         const isOpen = expandedTier === tier;
 
         return (
@@ -254,7 +370,7 @@ export default function GradeRankingPanel({
               <div className="flex items-center gap-3">
                 <span className={`text-2xl font-display font-bold ${meta.color}`}>{meta.label}</span>
                 <div className="text-left">
-                  <div className="text-sm font-bold text-foreground/90">五维 0–20 分档</div>
+                  <div className="text-sm font-bold text-foreground/90">{foldHeadline}</div>
                   <div className="text-xs text-muted-foreground">{meta.desc}</div>
                 </div>
               </div>
@@ -300,7 +416,7 @@ export default function GradeRankingPanel({
                               )}
                             </div>
                             <div className={`text-lg font-bold shrink-0 ${meta.color}`}>
-                              {p.item.avg_score.toFixed(1)}
+                              {formatPrimaryScoreLabel(p.item.avg_score, p.item.rubric_raw_max)}
                             </div>
                             <div className="text-xs text-muted-foreground shrink-0 w-36 text-right">
                               {new Date(p.item.timestamp).toLocaleString()}
@@ -316,6 +432,10 @@ export default function GradeRankingPanel({
                                 isForked={!!forkMap[p.item.file_name]}
                                 onClose={() => setSelectedFile(null)}
                                 onReauditDone={onReauditDone}
+                                onResultMissing={() => {
+                                  setSelectedFile(null);
+                                  onRankingDataStale?.();
+                                }}
                               />
                             </div>
                           )}

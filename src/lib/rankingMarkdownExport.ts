@@ -7,7 +7,9 @@ import {
 } from "@/lib/rankingRuleFilter";
 import {
   FIVE_DIM_KEYS_ZH,
+  FOUR_DIM_RUBRIC_KEYS_EN,
   averageFiveDims,
+  averageFourDimsOutOf10,
   letterTierFromReports,
   type LetterTier,
 } from "@/lib/dimensionTier";
@@ -25,6 +27,7 @@ import {
   type StoredDuelMatch,
 } from "@/lib/duelBracketStorage";
 import { rankingItemDisplayLabel } from "@/lib/utils";
+import { compareRankingScoreDesc, formatPrimaryScoreLabel, scoreNorm100 } from "@/lib/scoreNorm";
 
 const TIER_ORDER: LetterTier[] = ["S", "A", "B", "C", "D", "?"];
 
@@ -39,7 +42,7 @@ function mergeByTitle(
   for (const item of rankings) {
     const title = rankingItemDisplayLabel(item, titleMap, fileGithubMap);
     const existing = map.get(title);
-    if (!existing || item.avg_score > existing.avg_score) map.set(title, item);
+    if (!existing || compareRankingScoreDesc(existing, item) > 0) map.set(title, item);
   }
   return Array.from(map.values());
 }
@@ -183,6 +186,8 @@ export interface BuildRankingMarkdownParams {
   lang: "zh" | "en";
   t: (k: TransKey, vars?: Record<string, string>) => string;
   roundId: string;
+  /** 多赛道时与 ?track= 一致，导出中擂台段落与当前赛道一致 */
+  duelTrackId?: string;
   pageUrl?: string;
   rankings: SavedResult[];
   /** 未传则与 rankings 相同 */
@@ -196,7 +201,7 @@ export function buildRankingMarkdownExport(p: BuildRankingMarkdownParams): strin
   const { t, roundId, rankings, titleMap, fileGithubMap, ruleFilterOption, pageUrl, lang } = p;
   const allForAlias = p.allRankingsForAliases ?? rankings;
   const fileAliases = buildFileNameAliasGroups(allForAlias, titleMap, fileGithubMap);
-  const snap = loadDuelBracketSnapshot(roundId);
+  const snap = loadDuelBracketSnapshot(roundId, (p.duelTrackId ?? "").trim() || undefined);
   const snapHasAnyArena = Boolean(
     snap && (["S", "A", "B"] as const).some((t) => tierHasBracketEvidence(snap, t))
   );
@@ -275,7 +280,14 @@ export function buildRankingMarkdownExport(p: BuildRankingMarkdownParams): strin
       } else {
         lines.push(`- *${t("ranking.sourceRepoUnknown")}*`);
       }
-      lines.push(`- **${t("ranking.exportAvgScore")}** ${item.avg_score}`);
+      {
+        const label = formatPrimaryScoreLabel(item.avg_score, item.rubric_raw_max);
+        const norm =
+          item.rubric_raw_max != null && item.rubric_raw_max > 0
+            ? `（归一 ${scoreNorm100(item.avg_score, item.rubric_raw_max).toFixed(1)}%）`
+            : "";
+        lines.push(`- **${t("ranking.exportAvgScore")}** ${label}${norm}`);
+      }
       lines.push(`- **${t("ranking.timestamp")}** ${item.timestamp}`);
       if (item.rule_version_id) {
         lines.push(`- **${t("ranking.ruleVersion")}** \`${item.rule_version_id}\``);
@@ -290,20 +302,34 @@ export function buildRankingMarkdownExport(p: BuildRankingMarkdownParams): strin
       }
       lines.push("");
 
-      const avg = averageFiveDims(item.reports ?? []);
-      lines.push(`#### ${t("ranking.radarSectionTitle")}`);
-      lines.push("");
-      lines.push(`*${t("ranking.radarScoreTableTitle")}*`);
-      lines.push("");
-      if (avg) {
+      const avg5 = averageFiveDims(item.reports ?? []);
+      const avg4 = averageFourDimsOutOf10(item.reports ?? []);
+      if (avg5) {
+        lines.push(`#### ${t("ranking.radarSectionTitle5")}`);
+        lines.push("");
+        lines.push(`*${t("ranking.radarScoreTableTitle")}*`);
+        lines.push("");
         lines.push(`| ${t("ranking.dimInnovation")} | ${t("ranking.dimTechnical")} | ${t("ranking.dimBusiness")} | ${t("ranking.dimUx")} | ${t("ranking.dimFeasibility")} |`);
         lines.push("| --- | --- | --- | --- | --- |");
         lines.push(
-          `| ${avg["创新性"].toFixed(1)} | ${avg["技术实现"].toFixed(1)} | ${avg["商业价值"].toFixed(1)} | ${avg["用户体验"].toFixed(1)} | ${avg["落地可行性"].toFixed(1)} |`
+          `| ${avg5["创新性"].toFixed(1)} | ${avg5["技术实现"].toFixed(1)} | ${avg5["商业价值"].toFixed(1)} | ${avg5["用户体验"].toFixed(1)} | ${avg5["落地可行性"].toFixed(1)} |`
         );
         lines.push("");
-        lines.push(`*${t("ranking.radarFootnote")}*`);
+        lines.push(`*${t("ranking.radarFootnote5")}*`);
+      } else if (avg4) {
+        lines.push(`#### ${t("ranking.radarSectionTitle4")}`);
+        lines.push("");
+        lines.push(`*${t("ranking.radarScoreTableTitle")}*`);
+        lines.push("");
+        const keys = [...FOUR_DIM_RUBRIC_KEYS_EN];
+        lines.push(`| ${keys.join(" | ")} |`);
+        lines.push(`| ${keys.map(() => "---").join(" | ")} |`);
+        lines.push(`| ${keys.map((k) => avg4[k].toFixed(1)).join(" | ")} |`);
+        lines.push("");
+        lines.push(`*${t("ranking.radarFootnote4")}*`);
       } else {
+        lines.push(`#### ${t("ranking.radarScoreTableTitle")}`);
+        lines.push("");
         lines.push(`*${t("my.noDimensionData")}*`);
       }
       lines.push("");

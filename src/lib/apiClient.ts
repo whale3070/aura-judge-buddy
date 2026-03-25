@@ -51,6 +51,17 @@ export function roundNavSuffix(roundIdFromUrl: string | null | undefined): strin
   return id ? `?round_id=${encodeURIComponent(id)}` : "";
 }
 
+/** 链接携带 round_id 与可选 track（多赛道排行/裁决与擂台一致） */
+export function roundNavSuffixWithTrack(
+  roundIdFromUrl: string | null | undefined,
+  trackId?: string | null
+): string {
+  const base = roundNavSuffix(roundIdFromUrl);
+  const t = (trackId ?? "").trim();
+  if (!t) return base;
+  return base ? `${base}&track=${encodeURIComponent(t)}` : `?track=${encodeURIComponent(t)}`;
+}
+
 /** 为 API path（含已有 query）追加 round_id；queryRoundId 为页面 URL 的 round_id 原值（可空） */
 export function withRoundQuery(path: string, queryRoundId?: string | null): string {
   const rid = effectiveRoundIdFromSearchParam(queryRoundId);
@@ -153,11 +164,17 @@ export interface AuditReport {
   content: string;
   score?: number;
   error?: string;
+  score_conflict?: boolean;
+  score_conflict_values?: number[];
+  /** >0 时 score 为各维原始分之和，与 rubric 满分之和一致 */
+  rubric_raw_max?: number;
 }
 
 export interface SavedResult {
   file_name: string;
   avg_score: number;
+  /** 各维满分之和；缺省/0 表示 avg_score 为 0–100 归一 */
+  rubric_raw_max?: number;
   timestamp: string;
   reports: AuditReport[];
   round_id?: string;
@@ -306,9 +323,9 @@ export async function fetchFileProjectTitlesAPI(queryRoundId?: string | null): P
   }
 }
 
-/** @param queryRoundId 传给 Supabase file-titles，使其请求 /api/submissions?round_id=（与当前轮次一致） */
+/** @param queryRoundId 与页面 round_id 一致，请求 /api/file-project-titles */
 export function fetchFileTitlesAPI(queryRoundId?: string | null): Promise<Record<string, string>> {
-  // Prefer backend-native endpoint to avoid extra dependency on Supabase Edge Function.
+  // 直连 Aura 后端，不经过 Supabase Edge Function。
   // Response shape: { "1774..._00_README.md": "Project Title" }
   return request<Record<string, string>>(withRoundQuery("/api/file-project-titles", queryRoundId))
     .then((data) => (data && typeof data === "object" ? data : {}))
@@ -325,12 +342,22 @@ export interface RoundTrackEntry {
   name: string;
   description?: string;
   prize_pool?: string;
+  /** 服务端写入：该赛道在 /api/ranking?track= 下的排名行数 */
+  ranking_count?: number;
 }
 
 export function fetchRoundTracksAPI(roundId: string): Promise<RoundTrackEntry[]> {
   return request<{ tracks: RoundTrackEntry[] }>(`/api/rounds/${encodeURIComponent(roundId)}/tracks`)
     .then((d) => (Array.isArray(d.tracks) ? d.tracks : []))
     .catch(() => []);
+}
+
+/** PUT /api/rounds/:id/tracks — 写入 .aura_tracks.json */
+export function putRoundTracksAPI(roundId: string, tracks: RoundTrackEntry[]): Promise<RoundTrackEntry[]> {
+  return request<{ tracks: RoundTrackEntry[] }>(`/api/rounds/${encodeURIComponent(roundId)}/tracks`, {
+    method: "PUT",
+    body: { tracks },
+  }).then((d) => (Array.isArray(d.tracks) ? d.tracks : []));
 }
 
 /** GET /api/rounds — 磁盘上的轮次目录 + 统计 */
@@ -415,6 +442,8 @@ export function postBatchIngestGithubURLs(
   body: {
     round_id: string;
     urls: string[];
+    /** 与本场赛道 id 一致；已配置赛道时后端必填 */
+    track?: string;
     skip_duplicates?: boolean;
     auto_audit?: boolean;
     concurrency?: number;

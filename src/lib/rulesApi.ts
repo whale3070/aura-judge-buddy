@@ -4,6 +4,8 @@ export interface ScoringDimension {
   key: string;
   name: string;
   weight: number;
+  /** 单项满分；缺省时前端展示与后端按 20（五维中文）处理 */
+  max?: number;
   description: string;
 }
 

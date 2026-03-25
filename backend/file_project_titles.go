@@ -49,6 +49,9 @@ func buildFileProjectTitleMap(roundID string) (map[string]string, error) {
 
 	entries, err := os.ReadDir(submissionRoundDirFor(roundID))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return out, nil
+		}
 		return nil, err
 	}
 

@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useI18n } from "@/lib/i18n";
 import { rankingItemDisplayLabel } from "@/lib/utils";
+import { compareRankingScoreDesc } from "@/lib/scoreNorm";
 import { ChevronDown } from "lucide-react";
 import FiveDimRadarChart from "@/components/FiveDimRadarChart";
 import DuelMatchDetail from "@/components/DuelMatchDetail";
@@ -34,7 +35,7 @@ function mergeByTitle(
   for (const item of rankings) {
     const title = rankingItemDisplayLabel(item, titleMap, fileGithubMap);
     const existing = map.get(title);
-    if (!existing || item.avg_score > existing.avg_score) map.set(title, item);
+    if (!existing || compareRankingScoreDesc(existing, item) > 0) map.set(title, item);
   }
   return Array.from(map.values());
 }
@@ -92,6 +93,8 @@ interface Props {
   /** readme 文件名 → 提交时 GitHub 仓库 URL（可选接口 /api/file-github-urls） */
   fileGithubMap?: Record<string, string>;
   emptyHint?: string;
+  /** 多赛道时与 ?track= 一致，用于读取对应擂台存证 */
+  duelTrackId?: string | null;
 }
 
 export default function RankingByTierPanel({
@@ -103,6 +106,7 @@ export default function RankingByTierPanel({
   fileForkMap = {},
   fileGithubMap = {},
   emptyHint,
+  duelTrackId,
 }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -113,7 +117,7 @@ export default function RankingByTierPanel({
     const bump = () => setSnapEpoch((e) => e + 1);
     window.addEventListener("aura-duel-snapshot-updated", bump);
     const onStorage = (ev: StorageEvent) => {
-      if (ev.key === DUEL_BRACKET_STORAGE_KEY) bump();
+      if (ev.key?.startsWith(DUEL_BRACKET_STORAGE_KEY)) bump();
     };
     window.addEventListener("storage", onStorage);
     return () => {
@@ -123,12 +127,12 @@ export default function RankingByTierPanel({
   }, []);
 
   useEffect(() => {
-    void syncDuelBracketFromServer(roundId);
-  }, [roundId]);
+    void syncDuelBracketFromServer(roundId, (duelTrackId ?? "").trim() || undefined);
+  }, [roundId, duelTrackId]);
 
   const snap = useMemo(
-    () => loadDuelBracketSnapshot(roundId),
-    [roundId, rankings.length, allRankingsForAliases.length, snapEpoch]
+    () => loadDuelBracketSnapshot(roundId, (duelTrackId ?? "").trim() || undefined),
+    [roundId, duelTrackId, rankings.length, allRankingsForAliases.length, snapEpoch]
   );
 
   const fileAliases = useMemo(
@@ -351,12 +355,7 @@ export default function RankingByTierPanel({
               </div>
             )}
 
-            <div className="space-y-3">
-              <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                {t("ranking.radarSectionTitle")}
-              </div>
-              {selected && <FiveDimRadarChart reports={selected.reports} />}
-            </div>
+            <div className="space-y-3">{selected && <FiveDimRadarChart reports={selected.reports} />}</div>
 
             {duelSectionVisible && (
               <div className="space-y-3 pt-2 border-t border-border/40">

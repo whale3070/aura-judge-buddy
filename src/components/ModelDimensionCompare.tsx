@@ -5,23 +5,25 @@ import {
   REVIEW_GAP_THRESHOLD,
 } from "@/lib/parseDimensionScores";
 import type { AuditReport } from "@/lib/api";
+import { formatPrimaryScoreLabel, scoreNorm100 } from "@/lib/scoreNorm";
 
 type JudgeResultLike = {
   file_name: string;
   avg_score: number;
+  rubric_raw_max?: number;
   reports: AuditReport[];
 };
 
-function getSuccessfulScores(reports: AuditReport[]): number[] {
+function getSuccessfulNorms(reports: AuditReport[]): number[] {
   return reports
     .filter((r) => r.error == null && r.score != null)
-    .map((r) => r.score!);
+    .map((r) => scoreNorm100(r.score!, r.rubric_raw_max));
 }
 
-function needsReview(score: number, allScores: number[]): boolean {
-  if (allScores.length <= 1) return false;
-  const min = Math.min(...allScores);
-  const max = Math.max(...allScores);
+function needsReview(norm: number, allNorms: number[]): boolean {
+  if (allNorms.length <= 1) return false;
+  const min = Math.min(...allNorms);
+  const max = Math.max(...allNorms);
   return max - min > REVIEW_GAP_THRESHOLD;
 }
 
@@ -34,7 +36,7 @@ export default function ModelDimensionCompare({
 }) {
   const { t } = useI18n();
   const reports = result.reports ?? [];
-  const successfulScores = getSuccessfulScores(reports);
+  const successfulNorms = getSuccessfulNorms(reports);
   const dimensionNames = getAllDimensionNames(reports);
 
   return (
@@ -64,9 +66,10 @@ export default function ModelDimensionCompare({
           </thead>
           <tbody>
             {reports.map((r, i) => {
-              const score = r.score ?? 0;
+              const raw = r.score ?? 0;
+              const norm = scoreNorm100(raw, r.rubric_raw_max);
               const hasError = !!r.error;
-              const needReview = !hasError && needsReview(score, successfulScores);
+              const needReview = !hasError && needsReview(norm, successfulNorms);
               return (
                 <tr key={i} className="border-b border-border/50">
                   <td className="p-2 font-medium text-foreground/90 capitalize">{r.model_name}</td>
@@ -74,8 +77,8 @@ export default function ModelDimensionCompare({
                     {hasError ? (
                       <span className="text-destructive text-xs">{t("my.compare.error")}</span>
                     ) : (
-                      <span className={score >= 80 ? "text-primary font-bold" : score < 60 ? "text-destructive font-bold" : "text-warning font-bold"}>
-                        {score}
+                      <span className={norm >= 80 ? "text-primary font-bold" : norm < 60 ? "text-destructive font-bold" : "text-warning font-bold"}>
+                        {formatPrimaryScoreLabel(raw, r.rubric_raw_max)}
                       </span>
                     )}
                   </td>
