@@ -82,9 +82,10 @@ const translations = {
   // Ranking page
   "ranking.title": { zh: "📊 项目排名", en: "📊 Project Rankings" },
   "ranking.note": {
-    zh: "按五维分档（S/A/B/C/D/?）展示。若本浏览器已保存并完成过「擂台 · 自动淘汰」同档位池，则同档内按擂台名次排序，并可查看对决理由。否则同档内不按名次排序（按名称排列），点击项目以雷达图查看五维 0–20 分（多模型取平均）。",
-    en: "Grouped by five-dimension tiers (S/A/B/C/D). If this browser has a completed arena bracket for the same pool tier, in-tier order follows that bracket and duel notes are available. Otherwise projects are not ranked within a tier (sorted by name); click a card to see a five-dimension 0–20 radar chart (averaged across models).",
+    zh: "按五维分档（S、A、B、C、D、?）展示。若本浏览器已保存并完成过同档位「擂台」存证：完整单循环（或旧版精简存证）下，同档按「AI 基础均分 + PK 胜场」排序并可查看对决理由；旧版淘汰赛存证则仍按擂台名次。否则同档内不按总分名次（按名称），点击项目查看五维雷达。",
+    en: "Grouped by five-dimension letter tiers (S through D and unclassified). If a completed arena snapshot exists for the pool tier: full round-robin (or legacy lite) orders within the tier by average AI score plus PK wins (ties and rationale as stored); legacy elimination snapshots keep bracket order. Otherwise in-tier order is by name; click a card for the 0–20 radar.",
   },
+  "ranking.trackTabAll": { zh: "全部赛道", en: "All tracks" },
   "ranking.tableTitle": { zh: "🏆 终焉大盘：逻辑生存率排行榜", en: "🏆 Final Leaderboard: Logic Survival Rate" },
   "ranking.rank": { zh: "RANK", en: "RANK" },
   "ranking.projectDoc": { zh: "项目文档", en: "Project Doc" },
@@ -108,11 +109,15 @@ const translations = {
     zh: "已应用最近一次擂台淘汰赛顺序：{tier} 档池（数据保存在本浏览器，仅作展示参考）。",
     en: "Arena bracket order applied for pool tier {tier} (saved in this browser for display only).",
   },
+  "ranking.bracketOrderHintRr": {
+    zh: "同 {tier} 档内按「AI 基础均分 + PK 胜场（每场胜 +1）」排序；数据来自已保存擂台完整单循环存证（含旧版精简单循环存证）。",
+    en: "Tier {tier} is ordered by average AI score plus PK wins (+1 per duel win), from the saved full round-robin arena snapshot (or legacy lite RR).",
+  },
   "ranking.noDuelRationale": {
     zh: "暂无与本项目相关的擂台对决记录。请由管理员在同一浏览器完成自动淘汰赛后刷新本页，或本项目未参加该档擂台。",
     en: "No stored duel rationales for this project. Run the auto bracket in this browser as admin, then refresh—or this project was not in that pool.",
   },
-  "ranking.duelRoundMeta": { zh: "第 {n} 轮", en: "Round {n}" },
+  "ranking.duelRoundMeta": { zh: "第 {n} 场", en: "Match {n}" },
   "ranking.duelWinner": { zh: "胜者", en: "Winner" },
   "ranking.duelReason": { zh: "理由摘要", en: "Rationale" },
   "ranking.sourceRepoLabel": { zh: "该项目源码地址：", en: "Source repository: " },
@@ -133,8 +138,8 @@ const translations = {
     en: "No completed arena bracket is stored in this browser. Projects in each tier are not ranked; click a card for the five-dimension radar and per-dimension scores.",
   },
   "ranking.unscopedBracketWarn": {
-    zh: "检测到本地擂台存证未标记轮次（旧版数据），无法与当前 round_id「{round}」严格对应，可能与其他轮次串档。若存证已过时或不确定来源，请清除后在本轮重新跑一次自动淘汰赛。",
-    en: "The saved arena snapshot has no round_id (legacy). It may not belong to round \"{round}\" and could mix rounds. If it is stale or unclear, clear it and re-run the auto bracket for this round.",
+    zh: "检测到本地擂台存证未标记轮次（旧版数据），无法与当前 round_id「{round}」严格对应。若存证过时或来源不明，请清除后在本轮重新跑一次自动擂台。",
+    en: "The saved arena snapshot has no round_id (legacy). It may not belong to round \"{round}\". If it is stale or unclear, clear it and re-run the auto arena for this round.",
   },
   "ranking.unscopedBracketClear": { zh: "清除擂台存证", en: "Clear arena snapshot" },
   "ranking.radarSectionTitle": { zh: "五维能力雷达图（0–20）", en: "Five-dimension radar (0–20)" },

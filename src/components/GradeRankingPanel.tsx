@@ -4,6 +4,12 @@ import JudgeDetail from "@/components/JudgeDetail";
 import STierDuelPanel from "@/components/STierDuelPanel";
 import { letterTierFromReports, type LetterTier } from "@/lib/dimensionTier";
 import { syncDuelBracketFromServer } from "@/lib/duelBracketRemote";
+import {
+  loadDuelBracketSnapshot,
+  sortArenaTierItems,
+  usesRoundRobinLiteRanking,
+  tierHasBracketEvidence,
+} from "@/lib/duelBracketStorage";
 
 interface TierConfig {
   tier: LetterTier;
@@ -75,6 +81,8 @@ interface MergedProject {
   tier: LetterTier;
 }
 
+type MergedArenaRow = MergedProject & { file_name: string; avg_score: number };
+
 interface Props {
   rankings: RankingItem[];
   loading: boolean;
@@ -102,12 +110,24 @@ export default function GradeRankingPanel({
 }: Props) {
   const [expandedTier, setExpandedTier] = useState<LetterTier | null>("S");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [snapEpoch, setSnapEpoch] = useState(0);
 
   useEffect(() => {
     const rid = (roundId ?? "").trim();
     if (!rid) return;
     void syncDuelBracketFromServer(rid);
   }, [roundId]);
+
+  useEffect(() => {
+    const bump = () => setSnapEpoch((e) => e + 1);
+    window.addEventListener("aura-duel-snapshot-updated", bump);
+    return () => window.removeEventListener("aura-duel-snapshot-updated", bump);
+  }, []);
+
+  const duelSnap = useMemo(
+    () => loadDuelBracketSnapshot(roundId ?? undefined),
+    [roundId, snapEpoch]
+  );
 
   const mergedProjects = useMemo(() => {
     const projectMap = new Map<string, MergedProject>();
@@ -134,11 +154,34 @@ export default function GradeRankingPanel({
     for (const p of mergedProjects) {
       groups[p.tier].push(p);
     }
+    const preferArena = Boolean(
+      duelSnap &&
+        (["S", "A", "B"] as const).some((tier) => tierHasBracketEvidence(duelSnap, tier))
+    );
+    const aliasSelf = new Map<string, string[]>(
+      mergedProjects.map((p) => [p.item.file_name, [p.item.file_name]])
+    );
     for (const t of TIER_ORDER) {
-      groups[t].sort((a, b) => b.item.avg_score - a.item.avg_score);
+      if (
+        preferArena &&
+        (t === "S" || t === "A" || t === "B") &&
+        usesRoundRobinLiteRanking(duelSnap, t)
+      ) {
+        const rows: MergedArenaRow[] = groups[t].map((p) => ({
+          ...p,
+          file_name: p.item.file_name,
+          avg_score: p.item.avg_score,
+        }));
+        const sorted = sortArenaTierItems(rows, t, duelSnap, true, aliasSelf, (r) =>
+          r.title.toLowerCase()
+        );
+        groups[t] = sorted.map(({ file_name: _f, avg_score: _a, ...rest }) => rest);
+      } else {
+        groups[t].sort((a, b) => b.item.avg_score - a.item.avg_score);
+      }
     }
     return groups;
-  }, [mergedProjects]);
+  }, [mergedProjects, duelSnap]);
 
   const duelCandidates = useMemo(
     () =>
@@ -148,6 +191,7 @@ export default function GradeRankingPanel({
           file_name: p.item.file_name,
           title: p.title,
           tier: p.tier as "S" | "A" | "B",
+          avg_score: p.item.avg_score,
         })),
     [mergedProjects]
   );

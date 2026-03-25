@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link, Navigate, useSearchParams, useNavigate } from "react-router-dom";
 import {
   fetchRankingsAPI,
+  fetchRoundTracksAPI,
   fetchFileTitlesAPI,
   fetchFileGithubUrlsAPI,
   fetchFileForkStatusesAPI,
@@ -11,6 +12,7 @@ import {
   sanitizeRoundIdParam,
   type SavedResult,
   type RuleVersionMeta,
+  type RoundTrackEntry,
 } from "@/lib/apiClient";
 import RankingByTierPanel from "@/components/RankingByTierPanel";
 import DuelLegacySnapshotBanner from "@/components/DuelLegacySnapshotBanner";
@@ -42,13 +44,15 @@ export default function Ranking() {
   const [loading, setLoading] = useState(true);
   const [ruleFilterOverride, setRuleFilterOverride] = useState<string | undefined>(undefined);
   const [versionMetas, setVersionMetas] = useState<RuleVersionMeta[]>([]);
+  const [roundTracks, setRoundTracks] = useState<RoundTrackEntry[]>([]);
+
+  const allowedTrackIds = useMemo(() => new Set(roundTracks.map((t) => t.id)), [roundTracks]);
 
   const trackFilter = useMemo(() => {
-    const v = trackQ.toLowerCase();
-    if (v === "agent_infra" || v === "agent-infra") return "agent_infra";
-    if (v === "user_facing" || v === "user-facing") return "user_facing";
+    if (roundTracks.length === 0) return "all";
+    if (trackQ && allowedTrackIds.has(trackQ)) return trackQ;
     return "all";
-  }, [trackQ]);
+  }, [roundTracks.length, allowedTrackIds, trackQ]);
 
   useEffect(() => {
     setRuleFilterOverride(undefined);
@@ -56,25 +60,53 @@ export default function Ranking() {
 
   useEffect(() => {
     if (!roundIdRequired) return;
+    let cancelled = false;
     setLoading(true);
-    Promise.all([
-      fetchRankingsAPI(roundIdRequired, trackFilter === "all" ? undefined : trackFilter),
-      fetchFileTitlesAPI(roundIdRequired),
-      fetchFileGithubUrlsAPI(roundIdRequired),
-      fetchFileForkStatusesAPI(roundIdRequired),
-      fetchFileProjectTitlesAPI(roundIdRequired),
-      fetchRuleVersionsAPI(roundIdRequired).catch(() => ({ versions: [] })),
-    ])
-      .then(([r, titles, githubMap, forkMap, projectTitles, ver]) => {
+
+    (async () => {
+      const tracks = await fetchRoundTracksAPI(roundIdRequired);
+      if (cancelled) return;
+
+      setRoundTracks(tracks);
+
+      const allowed = new Set(tracks.map((t) => t.id));
+      const q = trackQ;
+      if (q && (tracks.length === 0 || !allowed.has(q))) {
+        const next =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search)
+            : new URLSearchParams();
+        next.delete("track");
+        navigate(`/ranking?${next.toString()}`, { replace: true });
+      }
+
+      const rankingTrack = tracks.length > 0 && q && allowed.has(q) ? q : undefined;
+
+      try {
+        const [r, titles, githubMap, forkMap, projectTitles, ver] = await Promise.all([
+          fetchRankingsAPI(roundIdRequired, rankingTrack),
+          fetchFileTitlesAPI(roundIdRequired),
+          fetchFileGithubUrlsAPI(roundIdRequired),
+          fetchFileForkStatusesAPI(roundIdRequired),
+          fetchFileProjectTitlesAPI(roundIdRequired),
+          fetchRuleVersionsAPI(roundIdRequired).catch(() => ({ versions: [] })),
+        ]);
+        if (cancelled) return;
         setRankings(r);
         // 后端 submission 项目名优先于 Supabase file-titles
         setTitleMap({ ...titles, ...projectTitles });
         setFileGithubMap(githubMap);
         setFileForkMap(forkMap);
         setVersionMetas(ver.versions ?? []);
-      })
-      .finally(() => setLoading(false));
-  }, [roundIdRequired]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roundIdRequired, trackQ, navigate]);
 
   const ruleOptions = useMemo(() => buildRuleFilterOptions(rankings, versionMetas), [rankings, versionMetas]);
 
@@ -93,6 +125,19 @@ export default function Ranking() {
 
   const emptyHint =
     !loading && rankings.length > 0 && filteredRankings.length === 0 ? t("ranking.emptyRuleFiltered") : undefined;
+
+  const navSuffix = roundNavSuffix(roundQ);
+
+  const trackTabs = useMemo(() => {
+    if (roundTracks.length === 0) return [];
+    return [
+      { id: "all" as const, label: t("ranking.trackTabAll") },
+      ...roundTracks.map((tr) => ({
+        id: tr.id,
+        label: (tr.name ?? "").trim() || tr.id,
+      })),
+    ];
+  }, [roundTracks, t]);
 
   const handleDownloadMarkdown = () => {
     if (filteredRankings.length === 0) {
@@ -118,13 +163,6 @@ export default function Ranking() {
   if (!roundIdRequired) {
     return <Navigate to="/rounds" replace />;
   }
-
-  const navSuffix = roundNavSuffix(roundIdRequired);
-  const trackTabs = [
-    { id: "all", label: "全部赛道" },
-    { id: "agent_infra", label: "Agent Infrastructure" },
-    { id: "user_facing", label: "User-Facing AI Agents" },
-  ] as const;
 
   return (
     <div className="min-h-screen bg-background p-5 relative overflow-hidden">
@@ -155,25 +193,27 @@ export default function Ranking() {
         <p className="text-center text-xs text-muted-foreground mb-4">
           {t("ranking.note")}
         </p>
-        <div className="flex gap-0 mb-3 border-b border-border justify-center">
-          {trackTabs.map((tb) => (
-            <button
-              key={tb.id}
-              type="button"
-              onClick={() => {
-                const next = new URLSearchParams(searchParams);
-                if (tb.id === "all") next.delete("track");
-                else next.set("track", tb.id);
-                navigate(`/ranking?${next.toString()}`);
-              }}
-              className={`px-4 py-2 text-xs font-bold tracking-wider transition-colors ${
-                trackFilter === tb.id ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tb.label}
-            </button>
-          ))}
-        </div>
+        {trackTabs.length > 0 ? (
+          <div className="flex gap-0 mb-3 border-b border-border justify-center flex-wrap">
+            {trackTabs.map((tb) => (
+              <button
+                key={tb.id}
+                type="button"
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams);
+                  if (tb.id === "all") next.delete("track");
+                  else next.set("track", tb.id);
+                  navigate(`/ranking?${next.toString()}`);
+                }}
+                className={`px-4 py-2 text-xs font-bold tracking-wider transition-colors ${
+                  trackFilter === tb.id ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tb.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <RankingRuleFilterBar
           value={effectiveRuleFilterId}
           onChange={setRuleFilterOverride}

@@ -28,6 +28,10 @@ interface Props {
 export default function DuelMatchDetail({ match }: Props) {
   const { t, lang } = useI18n();
 
+  if (match.status === "skipped" && match.error) {
+    return <p className="text-xs text-muted-foreground">{match.error}</p>;
+  }
+
   if (match.status === "error" && match.error) {
     return <p className="text-xs text-destructive">{match.error}</p>;
   }

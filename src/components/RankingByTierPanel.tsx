@@ -7,8 +7,12 @@ import {
   getDuelMatchesForFileSet,
   buildFileNameAliasGroups,
   bracketRankIndexForAliases,
+  usesRoundRobinLiteRanking,
+  isPkRoundRobinArenaFormat,
+  sortArenaTierItems,
+  tierHasBracketEvidence,
+  getBracketSliceForTier,
   type DuelBracketSnapshot,
-  type BracketPoolTier,
 } from "@/lib/duelBracketStorage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -41,26 +45,24 @@ function displayLabel(item: SavedResult, titleMap: Record<string, string>): stri
   return titleMap[item.file_name] || item.file_name;
 }
 
-/** 同档内：有已完成擂台存证且档位匹配时按擂台顺序；否则按展示名排序（不按分数排名） */
+/** 同档内：单循环存证按 AI 基础分 + PK 积分；淘汰赛存证按擂台名次；否则按展示名 */
 function sortWithinTier(
   items: SavedResult[],
   tier: LetterTier,
   snap: DuelBracketSnapshot | null,
-  preferBracketOrder: boolean,
   titleMap: Record<string, string>,
   fileAliases: Map<string, string[]>
 ): SavedResult[] {
   const label = (it: SavedResult) => displayLabel(it, titleMap).toLowerCase();
-  if (
-    !preferBracketOrder ||
-    !snap ||
-    snap.poolTier !== (tier as BracketPoolTier)
-  ) {
+  if (!snap || !tierHasBracketEvidence(snap, tier)) {
     return [...items].sort((a, b) => label(a).localeCompare(label(b), "zh-Hans-CN"));
+  }
+  if (usesRoundRobinLiteRanking(snap, tier)) {
+    return sortArenaTierItems(items, tier, snap, true, fileAliases, label);
   }
   const idx = (it: SavedResult) => {
     const names = fileAliases.get(it.file_name) ?? [it.file_name];
-    return bracketRankIndexForAliases(names, snap);
+    return bracketRankIndexForAliases(names, snap, tier);
   };
   return [...items].sort((a, b) => idx(a) - idx(b));
 }
@@ -124,9 +126,10 @@ export default function RankingByTierPanel({
     [allRankingsForAliases, titleMap]
   );
 
-  const preferBracketOrder = Boolean(
-    snap && snap.matches.length > 0 && snap.matches.some((m) => m.status === "done")
-  );
+  const snapHasAnyArena = useMemo(() => {
+    if (!snap) return false;
+    return (["S", "A", "B"] as const).some((t) => tierHasBracketEvidence(snap, t));
+  }, [snap]);
 
   const byTier = useMemo(() => {
     const merged = mergeByTitle(rankings, titleMap);
@@ -143,20 +146,30 @@ export default function RankingByTierPanel({
       groups[tier].push(item);
     }
     for (const tier of TIER_ORDER) {
-      groups[tier] = sortWithinTier(groups[tier], tier, snap, preferBracketOrder, titleMap, fileAliases);
+      groups[tier] = sortWithinTier(groups[tier], tier, snap, titleMap, fileAliases);
     }
     return groups;
-  }, [rankings, titleMap, snap, preferBracketOrder, fileAliases]);
+  }, [rankings, titleMap, snap, fileAliases]);
 
   const openDetail = (item: SavedResult) => {
     setSelected(item);
     setOpen(true);
   };
 
+  const selectedLetterTier = selected ? letterTierFromReports(selected.reports) : null;
+  const selectedPoolTier =
+    selectedLetterTier === "S" || selectedLetterTier === "A" || selectedLetterTier === "B"
+      ? selectedLetterTier
+      : undefined;
+
   /** 与具体规则筛选下的分档无关：只要本地存证里本场有该 readme 的对决就展示（避免「全部规则」与单规则下档位不一致导致淘汰赛整块消失） */
   const matchesForSelected =
-    selected && preferBracketOrder && snap
-      ? getDuelMatchesForFileSet(fileAliases.get(selected.file_name) ?? [selected.file_name], snap)
+    selected && snap && selectedPoolTier && tierHasBracketEvidence(snap, selectedPoolTier)
+      ? getDuelMatchesForFileSet(
+          fileAliases.get(selected.file_name) ?? [selected.file_name],
+          snap,
+          selectedPoolTier
+        )
       : [];
   const duelSectionVisible = matchesForSelected.length > 0;
   const selectedGithub = selected ? resolveGithubUrl(selected, fileGithubMap) : undefined;
@@ -174,12 +187,22 @@ export default function RankingByTierPanel({
 
   return (
     <>
-      {preferBracketOrder && snap && (
-        <p className="text-xs text-muted-foreground mb-4 border border-border/60 bg-muted/20 px-3 py-2">
-          {t("ranking.bracketOrderHint", { tier: snap.poolTier })}
-        </p>
+      {snapHasAnyArena && snap && (
+        <div className="text-xs text-muted-foreground mb-4 border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
+          {(["S", "A", "B"] as const).map((tier) => {
+            if (!tierHasBracketEvidence(snap, tier)) return null;
+            const slice = getBracketSliceForTier(snap, tier);
+            return (
+              <p key={tier}>
+                {isPkRoundRobinArenaFormat(slice?.arenaFormat)
+                  ? t("ranking.bracketOrderHintRr", { tier })
+                  : t("ranking.bracketOrderHint", { tier })}
+              </p>
+            );
+          })}
+        </div>
       )}
-      {!preferBracketOrder && (
+      {!snapHasAnyArena && (
         <p className="text-xs text-muted-foreground mb-4 border border-border/60 bg-muted/20 px-3 py-2">
           {t("ranking.noBracketUiHint")}
         </p>
@@ -202,7 +225,7 @@ export default function RankingByTierPanel({
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="px-4 pb-4 pt-0 border-t border-secondary/20">
-                  {preferBracketOrder ? (
+                  {snap && tierHasBracketEvidence(snap, tier) ? (
                     <ul className="space-y-1 pt-3">
                       {list.map((item, i) => {
                         const displayTitle = displayLabel(item, titleMap);

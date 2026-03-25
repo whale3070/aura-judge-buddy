@@ -1547,6 +1547,9 @@ func main() {
 	r.POST("/api/rounds", postCreateRound)
 	r.GET("/api/rounds/:id", getRoundDetail)
 	r.PUT("/api/rounds/:id", putRoundMeta)
+	// 赛道元数据：submissions/<round_id>/.aura_tracks.json（与 round_tracks.go）
+	r.GET("/api/rounds/:id/tracks", getRoundTracksHTTP)
+	r.PUT("/api/rounds/:id/tracks", putRoundTracksHTTP)
 	r.GET("/api/rounds/:id/judges-panel", getJudgesPanel)
 	r.PUT("/api/rounds/:id/judges-panel", putJudgesPanel)
 	r.POST("/api/rounds/:id/judges-panel/auto-assign", postJudgesAutoAssign)

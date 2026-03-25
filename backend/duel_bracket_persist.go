@@ -2,20 +2,86 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 // 与管理台 / 排行榜 localStorage 结构一致；放在 submissions/<round_id>/ 下，避免 judge-result 内普通存证 JSON 被 getRanking 误读。
+// 历史单文件（仅一份）；新写入为 .aura_duel_bracket_snapshot.<unixNano>.json，多次擂台互不覆盖。GET 返回其中最新一份。
 const duelBracketSnapshotFile = ".aura_duel_bracket_snapshot.json"
 
-func duelBracketSnapshotPath(roundID string) string {
-	return filepath.Join(submissionRoundDirFor(roundID), duelBracketSnapshotFile)
+// isDuelBracketSnapshotEntry 是否为本轮擂台存证文件（旧单文件或带纳秒时间戳的新文件）。
+func isDuelBracketSnapshotEntry(name string) bool {
+	if name == duelBracketSnapshotFile {
+		return true
+	}
+	const pref = ".aura_duel_bracket_snapshot."
+	if !strings.HasPrefix(name, pref) || !strings.HasSuffix(name, ".json") {
+		return false
+	}
+	numPart := name[len(pref) : len(name)-len(".json")]
+	if numPart == "" {
+		return false
+	}
+	for _, r := range numPart {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// 排序键：带数字后缀的用文件名内纳秒（与我们写入时一致）；旧版单文件用 mtime。
+func duelBracketSnapshotSortKey(entryName string, mod time.Time) int64 {
+	if entryName == duelBracketSnapshotFile {
+		return mod.UnixNano()
+	}
+	const pref = ".aura_duel_bracket_snapshot."
+	numStr := entryName[len(pref) : len(entryName)-len(".json")]
+	if n, err := strconv.ParseInt(numStr, 10, 64); err == nil {
+		return n
+	}
+	return mod.UnixNano()
+}
+
+func latestDuelBracketSnapshotPath(roundID string) (string, error) {
+	dir := submissionRoundDirFor(roundID)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", os.ErrNotExist
+		}
+		return "", err
+	}
+	var bestPath string
+	var bestKey int64 = -1
+	for _, e := range entries {
+		if e.IsDir() || !isDuelBracketSnapshotEntry(e.Name()) {
+			continue
+		}
+		p := filepath.Join(dir, e.Name())
+		st, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		k := duelBracketSnapshotSortKey(e.Name(), st.ModTime())
+		if k > bestKey {
+			bestKey = k
+			bestPath = p
+		}
+	}
+	if bestPath == "" {
+		return "", os.ErrNotExist
+	}
+	return bestPath, nil
 }
 
 // GET /api/duel-bracket-snapshot?round_id= — 公开读取，供排名页同步服务端擂台结果
@@ -25,7 +91,15 @@ func getDuelBracketSnapshot(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 round_id"})
 		return
 	}
-	p := duelBracketSnapshotPath(roundID)
+	p, err := latestDuelBracketSnapshotPath(roundID)
+	if err != nil {
+		if os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取目录失败"})
+		return
+	}
 	data, err := os.ReadFile(p)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -82,24 +156,42 @@ func putDuelBracketSnapshot(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "无法创建轮次目录"})
 		return
 	}
-	p := duelBracketSnapshotPath(roundID)
+	ts := time.Now().UnixNano()
+	p := filepath.Join(submissionRoundDirFor(roundID), fmt.Sprintf(".aura_duel_bracket_snapshot.%d.json", ts))
 	if err := os.WriteFile(p, raw, 0644); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入失败"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "path": filepath.Base(p)})
 }
 
-// DELETE /api/duel-bracket-snapshot?round_id= — 管理员删除服务端存证
+// DELETE /api/duel-bracket-snapshot?round_id= — 删除该轮次全部擂台存证（旧单文件 + 所有时间戳文件）
 func deleteDuelBracketSnapshot(c *gin.Context) {
 	roundID, err := sanitizeRoundIDOrDefault(c.Query("round_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 round_id"})
 		return
 	}
-	p := duelBracketSnapshotPath(roundID)
-	err = os.Remove(p)
-	if err != nil && !os.IsNotExist(err) {
+	dir := submissionRoundDirFor(roundID)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			c.JSON(http.StatusOK, gin.H{"ok": true})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取目录失败"})
+		return
+	}
+	var delErr error
+	for _, e := range entries {
+		if e.IsDir() || !isDuelBracketSnapshotEntry(e.Name()) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, e.Name())); err != nil && !os.IsNotExist(err) {
+			delErr = err
+		}
+	}
+	if delErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败"})
 		return
 	}

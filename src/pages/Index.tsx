@@ -24,6 +24,7 @@ import AuditIndeterminateProgress from "@/components/AuditIndeterminateProgress"
 import GradeRankingPanel from "@/components/GradeRankingPanel";
 import DuelLegacySnapshotBanner from "@/components/DuelLegacySnapshotBanner";
 import { useI18n, LanguageToggle } from "@/lib/i18n";
+import { randomUUIDCompat } from "@/lib/utils";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -167,7 +168,7 @@ export default function Index() {
       return;
     }
     setRunning(true);
-    const id = crypto.randomUUID();
+    const id = randomUUIDCompat();
     addReport({ id, fileName: selectedFile, avgScore: null, statusText: "RUNNING", reports: [], open: true });
     try {
       const data = await submitAuditAPI({
@@ -182,7 +183,7 @@ export default function Index() {
       const avg = extractAvgScore(data.reports);
       removeReport(id);
       addReport({
-        id: crypto.randomUUID(),
+        id: randomUUIDCompat(),
         fileName: selectedFile,
         avgScore: avg,
         statusText: "SINGLE_OK",
@@ -200,7 +201,7 @@ export default function Index() {
       setRankings(r);
     } catch (err: any) {
       removeReport(id);
-      addReport({ id: crypto.randomUUID(), fileName: selectedFile, avgScore: null, statusText: "SINGLE_FAIL", reports: [], error: err.message, open: true });
+      addReport({ id: randomUUIDCompat(), fileName: selectedFile, avgScore: null, statusText: "SINGLE_FAIL", reports: [], error: err.message, open: true });
     }
     setRunning(false);
   };
@@ -235,7 +236,7 @@ export default function Index() {
     let started = 0;
     setProgress({ done: 0, total, started: 0 });
     if (total === 0) {
-      addReport({ id: crypto.randomUUID(), fileName: "[BATCH]", avgScore: null, statusText: "NO_PENDING_FILES", reports: [], open: false });
+      addReport({ id: randomUUIDCompat(), fileName: "[BATCH]", avgScore: null, statusText: "NO_PENDING_FILES", reports: [], open: false });
       setBatchRunning(false);
       return;
     }
@@ -247,8 +248,8 @@ export default function Index() {
         const file = pending[myIdx];
         started++;
         setProgress({ done, total, started });
-        addReport({ id: crypto.randomUUID(), fileName: file, avgScore: null, statusText: `WORKER#${workerId} START`, reports: [], open: false });
-        const placeholderId = crypto.randomUUID();
+        addReport({ id: randomUUIDCompat(), fileName: file, avgScore: null, statusText: `WORKER#${workerId} START`, reports: [], open: false });
+        const placeholderId = randomUUIDCompat();
         addReport({ id: placeholderId, fileName: file, avgScore: null, statusText: `WORKER#${workerId} RUNNING`, reports: [], open: false });
         const ac = new AbortController();
         inflightAbortControllersRef.current.add(ac);
@@ -270,7 +271,7 @@ export default function Index() {
           const avg = extractAvgScore(data.reports);
           removeReport(placeholderId);
           addReport({
-            id: crypto.randomUUID(),
+            id: randomUUIDCompat(),
             fileName: file,
             avgScore: avg,
             statusText: `WORKER#${workerId} OK`,
@@ -281,7 +282,7 @@ export default function Index() {
           });
         } catch (err: any) {
           removeReport(placeholderId);
-          addReport({ id: crypto.randomUUID(), fileName: file, avgScore: null, statusText: `WORKER#${workerId} FAIL`, reports: [], error: err.message, open: false });
+          addReport({ id: randomUUIDCompat(), fileName: file, avgScore: null, statusText: `WORKER#${workerId} FAIL`, reports: [], error: err.message, open: false });
         } finally {
           inflightAbortControllersRef.current.delete(ac);
         }
@@ -303,7 +304,7 @@ export default function Index() {
     setBatchRunning(false);
     setLastBatchDurationMs(Date.now() - startedAt);
     addReport({
-      id: crypto.randomUUID(),
+      id: randomUUIDCompat(),
       fileName: `[BATCH]`,
       avgScore: null,
       statusText: batchStopRef.current ? "STOPPED" : "FINISHED",
@@ -341,7 +342,7 @@ export default function Index() {
     let started = 0;
     setProgress({ done: 0, total, started: 0 });
     if (total === 0) {
-      addReport({ id: crypto.randomUUID(), fileName: "[REJUDGE_ALL]", avgScore: null, statusText: "NO_FILES", reports: [], open: false });
+      addReport({ id: randomUUIDCompat(), fileName: "[REJUDGE_ALL]", avgScore: null, statusText: "NO_FILES", reports: [], open: false });
       setRejudgeAllRunning(false);
       return;
     }
@@ -353,8 +354,8 @@ export default function Index() {
         const file = allFiles[myIdx];
         started++;
         setProgress({ done, total, started });
-        addReport({ id: crypto.randomUUID(), fileName: file, avgScore: null, statusText: `REJUDGE#${workerId} START`, reports: [], open: false });
-        const placeholderId = crypto.randomUUID();
+        addReport({ id: randomUUIDCompat(), fileName: file, avgScore: null, statusText: `REJUDGE#${workerId} START`, reports: [], open: false });
+        const placeholderId = randomUUIDCompat();
         addReport({ id: placeholderId, fileName: file, avgScore: null, statusText: `REJUDGE#${workerId} RUNNING`, reports: [], open: false });
         const ac = new AbortController();
         inflightAbortControllersRef.current.add(ac);
@@ -376,7 +377,7 @@ export default function Index() {
           const avg = extractAvgScore(data.reports);
           removeReport(placeholderId);
           addReport({
-            id: crypto.randomUUID(),
+            id: randomUUIDCompat(),
             fileName: file,
             avgScore: avg,
             statusText: `REJUDGE#${workerId} OK`,
@@ -387,7 +388,7 @@ export default function Index() {
           });
         } catch (err: any) {
           removeReport(placeholderId);
-          addReport({ id: crypto.randomUUID(), fileName: file, avgScore: null, statusText: `REJUDGE#${workerId} FAIL`, reports: [], error: err.message, open: false });
+          addReport({ id: randomUUIDCompat(), fileName: file, avgScore: null, statusText: `REJUDGE#${workerId} FAIL`, reports: [], error: err.message, open: false });
         } finally {
           inflightAbortControllersRef.current.delete(ac);
         }
@@ -409,7 +410,7 @@ export default function Index() {
     setRejudgeAllRunning(false);
     setLastBatchDurationMs(Date.now() - startedAt);
     addReport({
-      id: crypto.randomUUID(),
+      id: randomUUIDCompat(),
       fileName: `[REJUDGE_ALL]`,
       avgScore: null,
       statusText: batchStopRef.current ? "STOPPED" : "FINISHED",
@@ -435,7 +436,7 @@ export default function Index() {
       setRejudgeAllRunning(false);
       if (batchStartedAtMs != null) setLastBatchDurationMs(Date.now() - batchStartedAtMs);
       addReport({
-        id: crypto.randomUUID(),
+        id: randomUUIDCompat(),
         fileName: `[BATCH]`,
         avgScore: null,
         statusText: "STOPPED",

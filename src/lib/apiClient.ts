@@ -319,6 +319,20 @@ export function fetchAdminConfigAPI(): Promise<{ admin_hash?: string; admin_wall
   return request<any>("/api/admin-config").catch(() => ({}));
 }
 
+/** GET /api/rounds/:id/tracks — 轮次赛道配置（每轮 submissions 目录下 .aura_tracks.json） */
+export interface RoundTrackEntry {
+  id: string;
+  name: string;
+  description?: string;
+  prize_pool?: string;
+}
+
+export function fetchRoundTracksAPI(roundId: string): Promise<RoundTrackEntry[]> {
+  return request<{ tracks: RoundTrackEntry[] }>(`/api/rounds/${encodeURIComponent(roundId)}/tracks`)
+    .then((d) => (Array.isArray(d.tracks) ? d.tracks : []))
+    .catch(() => []);
+}
+
 /** GET /api/rounds — 磁盘上的轮次目录 + 统计 */
 export interface RoundListEntry {
   id: string;

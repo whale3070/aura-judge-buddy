@@ -16,8 +16,12 @@ import {
   getDuelMatchesForFileSet,
   buildFileNameAliasGroups,
   bracketRankIndexForAliases,
+  usesRoundRobinLiteRanking,
+  sortArenaTierItems,
+  tierHasBracketEvidence,
+  isPkRoundRobinArenaFormat,
+  getBracketSliceForTier,
   type DuelBracketSnapshot,
-  type BracketPoolTier,
   type StoredDuelMatch,
 } from "@/lib/duelBracketStorage";
 
@@ -50,17 +54,19 @@ function sortWithinTier(
   items: SavedResult[],
   tier: LetterTier,
   snap: DuelBracketSnapshot | null,
-  preferBracketOrder: boolean,
   titleMap: Record<string, string>,
   fileAliases: Map<string, string[]>
 ): SavedResult[] {
   const label = (it: SavedResult) => displayLabel(it, titleMap).toLowerCase();
-  if (!preferBracketOrder || !snap || snap.poolTier !== (tier as BracketPoolTier)) {
+  if (!snap || !tierHasBracketEvidence(snap, tier)) {
     return [...items].sort((a, b) => label(a).localeCompare(label(b), "zh-Hans-CN"));
+  }
+  if (usesRoundRobinLiteRanking(snap, tier)) {
+    return sortArenaTierItems(items, tier, snap, true, fileAliases, label);
   }
   const idx = (it: SavedResult) => {
     const names = fileAliases.get(it.file_name) ?? [it.file_name];
-    return bracketRankIndexForAliases(names, snap);
+    return bracketRankIndexForAliases(names, snap, tier);
   };
   return [...items].sort((a, b) => idx(a) - idx(b));
 }
@@ -69,7 +75,6 @@ function buildByTier(
   rankings: SavedResult[],
   titleMap: Record<string, string>,
   snap: DuelBracketSnapshot | null,
-  preferBracketOrder: boolean,
   fileAliases: Map<string, string[]>
 ): Record<LetterTier, SavedResult[]> {
   const merged = mergeByTitle(rankings, titleMap);
@@ -86,7 +91,7 @@ function buildByTier(
     groups[tier].push(item);
   }
   for (const tier of TIER_ORDER) {
-    groups[tier] = sortWithinTier(groups[tier], tier, snap, preferBracketOrder, titleMap, fileAliases);
+    groups[tier] = sortWithinTier(groups[tier], tier, snap, titleMap, fileAliases);
   }
   return groups;
 }
@@ -128,6 +133,10 @@ function formatDuelMatchMarkdown(
   t: (k: TransKey, vars?: Record<string, string>) => string
 ): string {
   const lines: string[] = [];
+  if (m.status === "skipped" && m.error) {
+    lines.push(`- **skipped:** ${mdTableCell(m.error)}`);
+    return lines.join("\n");
+  }
   if (m.status === "error" && m.error) {
     lines.push(`- **error:** ${mdTableCell(m.error)}`);
     return lines.join("\n");
@@ -177,10 +186,10 @@ export function buildRankingMarkdownExport(p: BuildRankingMarkdownParams): strin
   const allForAlias = p.allRankingsForAliases ?? rankings;
   const fileAliases = buildFileNameAliasGroups(allForAlias, titleMap);
   const snap = loadDuelBracketSnapshot(roundId);
-  const preferBracketOrder = Boolean(
-    snap && snap.matches.length > 0 && snap.matches.some((m) => m.status === "done")
+  const snapHasAnyArena = Boolean(
+    snap && (["S", "A", "B"] as const).some((t) => tierHasBracketEvidence(snap, t))
   );
-  const byTier = buildByTier(rankings, titleMap, snap, preferBracketOrder, fileAliases);
+  const byTier = buildByTier(rankings, titleMap, snap, fileAliases);
 
   const lines: string[] = [];
   lines.push(`# ${t("ranking.title")}`);
@@ -208,11 +217,23 @@ export function buildRankingMarkdownExport(p: BuildRankingMarkdownParams): strin
   lines.push("");
   lines.push(t("ranking.note"));
   lines.push("");
-  if (preferBracketOrder && snap) {
-    lines.push(t("ranking.bracketOrderHint", { tier: snap.poolTier }));
+  if (snapHasAnyArena && snap) {
+    for (const tier of ["S", "A", "B"] as const) {
+      if (!tierHasBracketEvidence(snap, tier)) continue;
+      const slice = getBracketSliceForTier(snap, tier);
+      lines.push(
+        isPkRoundRobinArenaFormat(slice?.arenaFormat)
+          ? t("ranking.bracketOrderHintRr", { tier })
+          : t("ranking.bracketOrderHint", { tier })
+      );
+    }
     lines.push("");
     lines.push(
-      `*${t("ranking.exportBracketSavedAt")} ${snap.savedAt} · ${t("ranking.exportBracketPool")} ${snap.poolTier}*`
+      `*${t("ranking.exportBracketSavedAt")} ${snap.savedAt} · poolTier ${snap.poolTier}${
+        snap.otherPoolTiers && Object.keys(snap.otherPoolTiers).length
+          ? ` + ${Object.keys(snap.otherPoolTiers).join(", ")}`
+          : ""
+      }*`
     );
   } else {
     lines.push(t("ranking.noBracketUiHint"));
@@ -292,11 +313,16 @@ export function buildRankingMarkdownExport(p: BuildRankingMarkdownParams): strin
       const itemTier = letterTierFromReports(item.reports);
       const duelTierOk =
         (itemTier === "S" || itemTier === "A" || itemTier === "B") &&
-        snap?.poolTier === itemTier;
-      if (preferBracketOrder && snap && duelTierOk) {
+        snap &&
+        tierHasBracketEvidence(snap, itemTier);
+      if (snapHasAnyArena && duelTierOk) {
         lines.push(`#### ${t("ranking.duelSectionTitle")}`);
         lines.push("");
-        const matches = getDuelMatchesForFileSet(fileAliases.get(item.file_name) ?? [item.file_name], snap);
+        const matches = getDuelMatchesForFileSet(
+          fileAliases.get(item.file_name) ?? [item.file_name],
+          snap,
+          itemTier
+        );
         if (matches.length === 0) {
           lines.push(t("ranking.noDuelRationale"));
         } else {

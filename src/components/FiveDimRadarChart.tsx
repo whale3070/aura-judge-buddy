@@ -10,8 +10,11 @@ import {
 import type { AuditReport } from "@/lib/api";
 import {
   FIVE_DIM_KEYS_ZH,
+  FOUR_DIM_RUBRIC_KEYS_EN,
   averageFiveDims,
+  averageFourDimsOutOf10,
   type FiveDimKeyZh,
+  type FourDimRubricKeyEn,
 } from "@/lib/dimensionTier";
 import { useI18n } from "@/lib/i18n";
 
@@ -27,11 +30,22 @@ interface Props {
   reports: AuditReport[] | undefined;
 }
 
+type RadarMode = { scale: 20; keys: readonly FiveDimKeyZh[]; avg: Record<FiveDimKeyZh, number> } | { scale: 10; keys: readonly FourDimRubricKeyEn[]; avg: Record<FourDimRubricKeyEn, number> };
+
+function resolveRadarMode(reports: AuditReport[] | undefined): RadarMode | null {
+  const list = reports ?? [];
+  const avg5 = averageFiveDims(list);
+  if (avg5) return { scale: 20, keys: FIVE_DIM_KEYS_ZH, avg: avg5 };
+  const avg4 = averageFourDimsOutOf10(list);
+  if (avg4) return { scale: 10, keys: FOUR_DIM_RUBRIC_KEYS_EN, avg: avg4 };
+  return null;
+}
+
 export default function FiveDimRadarChart({ reports }: Props) {
   const { t } = useI18n();
-  const avg = averageFiveDims(reports ?? []);
+  const mode = resolveRadarMode(reports);
 
-  if (!avg) {
+  if (!mode) {
     return (
       <p className="text-xs text-muted-foreground border border-border/60 bg-muted/20 px-3 py-2 rounded">
         {t("my.noDimensionData")}
@@ -39,9 +53,11 @@ export default function FiveDimRadarChart({ reports }: Props) {
     );
   }
 
-  const data = FIVE_DIM_KEYS_ZH.map((k) => ({
-    subject: t(DIM_LABEL_KEY[k]),
-    score: Math.round(avg[k] * 10) / 10,
+  const maxScore = mode.scale;
+  const data = mode.keys.map((k) => ({
+    subject:
+      mode.scale === 20 ? t(DIM_LABEL_KEY[k as FiveDimKeyZh]) : (k as string),
+    score: Math.round(mode.avg[k as keyof typeof mode.avg] * 10) / 10,
   }));
 
   return (
@@ -56,7 +72,7 @@ export default function FiveDimRadarChart({ reports }: Props) {
             />
             <PolarRadiusAxis
               angle={30}
-              domain={[0, 20]}
+              domain={[0, maxScore]}
               tickCount={5}
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 9 }}
             />
@@ -69,7 +85,7 @@ export default function FiveDimRadarChart({ reports }: Props) {
               strokeWidth={2}
             />
             <Tooltip
-              formatter={(v: number) => [`${v} / 20`, t("ranking.radarTooltipScore")]}
+              formatter={(v: number) => [`${v} / ${maxScore}`, t("ranking.radarTooltipScore")]}
               contentStyle={{
                 background: "hsl(var(--card))",
                 border: "1px solid hsl(var(--border))",
@@ -85,18 +101,31 @@ export default function FiveDimRadarChart({ reports }: Props) {
           {t("ranking.radarScoreTableTitle")}
         </p>
         <ul className="space-y-2 text-sm">
-          {FIVE_DIM_KEYS_ZH.map((k) => (
-            <li
-              key={k}
-              className="flex justify-between gap-3 items-baseline border-b border-border/50 pb-2 last:border-0"
-            >
-              <span className="text-muted-foreground shrink-0">{t(DIM_LABEL_KEY[k])}</span>
-              <span className="font-mono font-semibold text-primary tabular-nums">
-                {avg[k].toFixed(1)}
-                <span className="text-muted-foreground font-normal text-xs ml-1">/ 20</span>
-              </span>
-            </li>
-          ))}
+          {mode.scale === 20
+            ? FIVE_DIM_KEYS_ZH.map((k) => (
+                <li
+                  key={k}
+                  className="flex justify-between gap-3 items-baseline border-b border-border/50 pb-2 last:border-0"
+                >
+                  <span className="text-muted-foreground shrink-0">{t(DIM_LABEL_KEY[k])}</span>
+                  <span className="font-mono font-semibold text-primary tabular-nums">
+                    {(mode.avg as Record<FiveDimKeyZh, number>)[k].toFixed(1)}
+                    <span className="text-muted-foreground font-normal text-xs ml-1">/ 20</span>
+                  </span>
+                </li>
+              ))
+            : FOUR_DIM_RUBRIC_KEYS_EN.map((k) => (
+                <li
+                  key={k}
+                  className="flex justify-between gap-3 items-baseline border-b border-border/50 pb-2 last:border-0"
+                >
+                  <span className="text-muted-foreground shrink-0">{k}</span>
+                  <span className="font-mono font-semibold text-primary tabular-nums">
+                    {(mode.avg as Record<FourDimRubricKeyEn, number>)[k].toFixed(1)}
+                    <span className="text-muted-foreground font-normal text-xs ml-1">/ 10</span>
+                  </span>
+                </li>
+              ))}
         </ul>
         <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">{t("ranking.radarFootnote")}</p>
       </div>
