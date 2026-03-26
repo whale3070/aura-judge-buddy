@@ -194,4 +194,4 @@ This project uses open-source frameworks including Vite, TypeScript, React, shad
 - 支持中英双语，适配TON生态钱包权限管理
 
 - 内置人工与AI评审对比案例，直观体现系统优势
-> （注：文档部分内容可能由 AI 生成）
+
