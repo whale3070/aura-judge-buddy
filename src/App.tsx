@@ -1,6 +1,6 @@
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { I18nProvider } from "@/lib/i18n";
@@ -32,33 +32,34 @@ function RootRoute() {
 const queryClient = new QueryClient();
 
 const App = () => (
-  <I18nProvider>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<RootRoute />} />
-            <Route path="/submit" element={<Submit />} />
-            <Route path="/ranking" element={<Ranking />} />
-            <Route path="/my-submission/:id" element={<MySubmission />} />
-            <Route path="/judge" element={<Index />} />
-            <Route path="/rounds" element={<RoundList />} />
-            <Route path="/rounds/new" element={<RoundForm />} />
-            <Route path="/rounds/:id" element={<RoundDetail />} />
-            <Route path="/rounds/:id/tracks" element={<RoundTracks />} />
-            <Route path="/rounds/:id/judge/:judgeId" element={<JudgeWorkspace />} />
-            <Route path="/rounds/:id/edit" element={<RoundForm />} />
-            <Route path="/rules" element={<RulesManagement />} />
-            <Route path="/admin/:hash" element={<AdminHashRedirect />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
-  </I18nProvider>
+  <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <I18nProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<RootRoute />} />
+              <Route path="/submit" element={<Submit />} />
+              <Route path="/ranking" element={<Ranking />} />
+              <Route path="/my-submission/:id" element={<MySubmission />} />
+              <Route path="/judge" element={<Index />} />
+              <Route path="/rounds" element={<RoundList />} />
+              <Route path="/rounds/new" element={<RoundForm />} />
+              <Route path="/rounds/:id" element={<RoundDetail />} />
+              <Route path="/rounds/:id/tracks" element={<RoundTracks />} />
+              <Route path="/rounds/:id/judge/:judgeId" element={<JudgeWorkspace />} />
+              <Route path="/rounds/:id/edit" element={<RoundForm />} />
+              <Route path="/rules" element={<RulesManagement />} />
+              <Route path="/admin/:hash" element={<AdminHashRedirect />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </I18nProvider>
+  </ThemeProvider>
 );
 
 export default App;

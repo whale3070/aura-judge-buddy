@@ -79,9 +79,12 @@ export function getBracketSliceForTier(
   tier: BracketPoolTier
 ): DuelBracketSnapshot | null {
   if (!snap) return null;
-  if (snap.poolTier === tier) return snap;
+  if (snap.poolTier === tier) {
+    if (!Array.isArray(snap.rankedFileNames) || !Array.isArray(snap.matches)) return null;
+    return snap;
+  }
   const slice = snap.otherPoolTiers?.[tier];
-  if (!slice) return null;
+  if (!slice || !Array.isArray(slice.rankedFileNames) || !Array.isArray(slice.matches)) return null;
   return {
     savedAt: snap.savedAt,
     roundId: snap.roundId,
@@ -144,6 +147,7 @@ export function usesRoundRobinLiteRanking(snap: DuelBracketSnapshot | null, tier
 /** readme 别名集合在本快照已完成场次中的胜场数（赢 +1） */
 export function pkWinCountForAliases(fileNames: string[], snap: DuelBracketSnapshot | null): number {
   if (!snap || fileNames.length === 0) return 0;
+  if (!Array.isArray(snap.matches)) return 0;
   const set = new Set(fileNames);
   let n = 0;
   for (const m of snap.matches) {
@@ -316,6 +320,17 @@ export function loadDuelBracketSnapshot(
     if (!raw) return null;
     const o = JSON.parse(raw) as DuelBracketSnapshot;
     if (!o?.poolTier || !Array.isArray(o.rankedFileNames) || !Array.isArray(o.matches)) return null;
+    if (o.otherPoolTiers && typeof o.otherPoolTiers === "object") {
+      const cleaned: Partial<Record<BracketPoolTier, BracketTierSlice>> = {};
+      for (const t of ["S", "A", "B"] as const) {
+        const sl = o.otherPoolTiers[t];
+        if (sl && Array.isArray(sl.rankedFileNames) && Array.isArray(sl.matches)) {
+          cleaned[t] = sl;
+        }
+      }
+      const keys = Object.keys(cleaned) as BracketPoolTier[];
+      o.otherPoolTiers = keys.length > 0 ? cleaned : undefined;
+    }
     const got = (o.roundId ?? "").trim();
     if (want !== "" && got !== "" && got !== want) return null;
     const gotT = (o.trackId ?? "").trim();

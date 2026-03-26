@@ -21,12 +21,28 @@ import {
   type RuleVersionMeta,
 } from "@/lib/apiClient";
 import { parseAndValidateYAML } from "@/lib/rulesApi";
+import { randomUUIDCompat } from "@/lib/utils";
 import { ArrowLeft, Plus, Trash2, AlertCircle, Check, Loader2 } from "lucide-react";
 
 const modes: RoundMode[] = ["online", "offline", "hybrid"];
 const statuses: RoundStatus[] = ["draft", "open", "judging", "closed", "archived"];
 
 const roundIdPattern = /^[a-zA-Z0-9._-]{1,80}$/;
+
+/** 稳定 key，避免可删改列表用 index 做 key 时 React 与浏览器 DOM 不一致（极端情况下会触发 removeChild 报错） */
+type DimensionRow = ScoringDimension & { rowId: string };
+
+function dimensionsWithRowIds(dims: ScoringDimension[]): DimensionRow[] {
+  return dims.map((d) => ({ ...d, rowId: randomUUIDCompat() }));
+}
+
+type PitchSubRow = { name: string; weight: number; rowKey: string };
+
+type PitchState = Omit<PitchConfig, "subScores"> & { subScores: PitchSubRow[] };
+
+function pitchSubsWithRowKeys(subs: { name: string; weight: number }[]): PitchSubRow[] {
+  return subs.map((s) => ({ ...s, rowKey: randomUUIDCompat() }));
+}
 
 export default function RoundForm() {
   const { t } = useI18n();
@@ -46,9 +62,12 @@ export default function RoundForm() {
   const [loading, setLoading] = useState(() => !isNew && Boolean(id));
   const [saving, setSaving] = useState(false);
 
-  const [dimensions, setDimensions] = useState<ScoringDimension[]>([...defaultDimensions]);
+  const [dimensions, setDimensions] = useState<DimensionRow[]>(() => dimensionsWithRowIds([...defaultDimensions]));
   const [gradeBands, setGradeBands] = useState<GradeBand[]>([...defaultGradeBands]);
-  const [pitch, setPitch] = useState<PitchConfig>({ ...defaultPitch });
+  const [pitch, setPitch] = useState<PitchState>(() => ({
+    ...defaultPitch,
+    subScores: pitchSubsWithRowKeys(defaultPitch.subScores),
+  }));
 
   const [ruleVersions, setRuleVersions] = useState<RuleVersionMeta[]>([]);
   const [rulesListLoading, setRulesListLoading] = useState(false);
@@ -75,7 +94,7 @@ export default function RoundForm() {
           setEndAt(m.end_at ?? "");
           if (m.status && statuses.includes(m.status as RoundStatus)) setStatus(m.status as RoundStatus);
           if (m.rules?.scoring_dimensions?.length) {
-            setDimensions(m.rules.scoring_dimensions.map((d) => ({ name: d.name, weight: d.weight })));
+            setDimensions(dimensionsWithRowIds(m.rules.scoring_dimensions.map((d) => ({ name: d.name, weight: d.weight }))));
           }
           if (m.rules?.grade_bands?.length) {
             setGradeBands(m.rules.grade_bands.map((b) => ({ grade: b.grade, min: b.min, max: b.max })));
@@ -85,14 +104,16 @@ export default function RoundForm() {
               enabled: m.pitch.enabled,
               weight: m.pitch.weight,
               subScores: m.pitch.sub_scores?.length
-                ? m.pitch.sub_scores.map((s) => ({ name: s.name, weight: s.weight }))
-                : [...defaultPitch.subScores],
+                ? pitchSubsWithRowKeys(m.pitch.sub_scores.map((s) => ({ name: s.name, weight: s.weight })))
+                : pitchSubsWithRowKeys([...defaultPitch.subScores]),
             });
           }
         }
       })
       .catch(() => {
-        if (!cancelled) toast.error("加载轮次失败，请确认 API 与 round_id");
+        if (!cancelled) {
+          window.setTimeout(() => toast.error("加载轮次失败，请确认 API 与 round_id"), 0);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -113,7 +134,7 @@ export default function RoundForm() {
         setRuleVersions(list);
       })
       .catch(() => {
-        if (!cancelled) toast.error("无法加载规则版本列表，请检查 API");
+        if (!cancelled) window.setTimeout(() => toast.error("无法加载规则版本列表，请检查 API"), 0);
       })
       .finally(() => {
         if (!cancelled) setRulesListLoading(false);
@@ -135,10 +156,10 @@ export default function RoundForm() {
         if (cancelled) return;
         const { parsed, validation } = parseAndValidateYAML(raw);
         if (!parsed) {
-          toast.error(validation.errors[0] ?? "规则 YAML 无效");
+          window.setTimeout(() => toast.error(validation.errors[0] ?? "规则 YAML 无效"), 0);
           return;
         }
-        setDimensions(parsed.dimensions.map((d) => ({ name: d.name, weight: d.weight })));
+        setDimensions(dimensionsWithRowIds(parsed.dimensions.map((d) => ({ name: d.name, weight: d.weight }))));
         const bands = parsed.gradingBands?.length
           ? parsed.gradingBands.map((g) => ({ grade: g.grade, min: g.min, max: g.max }))
           : [...defaultGradeBands];
@@ -146,7 +167,7 @@ export default function RoundForm() {
       } catch (e: unknown) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : "加载规则失败";
-          toast.error(msg);
+          window.setTimeout(() => toast.error(msg), 0);
         }
       } finally {
         if (!cancelled) setRuleYamlLoading(false);
@@ -160,30 +181,32 @@ export default function RoundForm() {
   const totalWeight = useMemo(() => dimensions.reduce((s, d) => s + d.weight, 0), [dimensions]);
   const weightValid = totalWeight === 100;
 
-  const updateDim = (i: number, field: keyof ScoringDimension, val: string | number) => {
+  const updateDim = (rowId: string, field: keyof ScoringDimension, val: string | number) => {
     setDimensions((prev) =>
-      prev.map((d, idx) => (idx === i ? { ...d, [field]: field === "weight" ? Number(val) : val } : d))
+      prev.map((d) =>
+        d.rowId === rowId ? { ...d, [field]: field === "weight" ? Number(val) : val } : d
+      )
     );
   };
-  const removeDim = (i: number) => setDimensions((prev) => prev.filter((_, idx) => idx !== i));
-  const addDim = () => setDimensions((prev) => [...prev, { name: "", weight: 0 }]);
+  const removeDim = (rowId: string) => setDimensions((prev) => prev.filter((d) => d.rowId !== rowId));
+  const addDim = () => setDimensions((prev) => [...prev, { name: "", weight: 0, rowId: randomUUIDCompat() }]);
 
-  const updateBand = (i: number, field: "min" | "max", val: number) => {
-    setGradeBands((prev) => prev.map((b, idx) => (idx === i ? { ...b, [field]: val } : b)));
+  const updateBand = (grade: string, field: "min" | "max", val: number) => {
+    setGradeBands((prev) => prev.map((b) => (b.grade === grade ? { ...b, [field]: val } : b)));
   };
 
-  const updatePitchSub = (i: number, field: "name" | "weight", val: string | number) => {
+  const updatePitchSub = (rowKey: string, field: "name" | "weight", val: string | number) => {
     setPitch((prev) => ({
       ...prev,
-      subScores: prev.subScores.map((s, idx) =>
-        idx === i ? { ...s, [field]: field === "weight" ? Number(val) : val } : s
+      subScores: prev.subScores.map((s) =>
+        s.rowKey === rowKey ? { ...s, [field]: field === "weight" ? Number(val) : val } : s
       ),
     }));
   };
 
   function buildMetaPayload(): Record<string, unknown> {
     const rules: Record<string, unknown> = {
-      scoring_dimensions: dimensions.map((d) => ({ name: d.name, weight: d.weight })),
+      scoring_dimensions: dimensions.map(({ name, weight }) => ({ name, weight })),
       grade_bands: gradeBands.map((b) => ({ grade: b.grade, min: b.min, max: b.max })),
     };
     if (isNew && selectedRuleVersionId.trim()) {
@@ -201,7 +224,7 @@ export default function RoundForm() {
       pitch: {
         enabled: pitch.enabled,
         weight: pitch.weight,
-        sub_scores: pitch.subScores.map((s) => ({ name: s.name, weight: s.weight })),
+        sub_scores: pitch.subScores.map(({ name, weight }) => ({ name, weight })),
       },
     };
   }
@@ -407,8 +430,8 @@ export default function RoundForm() {
                 {!selectedRuleVersionId ? (
                   <p className="text-xs text-muted-foreground py-2">{t("rounds.pickRuleFirst")}</p>
                 ) : (
-                  dimensions.map((d, i) => (
-                    <div key={i} className="flex gap-2 items-center text-sm">
+                  dimensions.map((d) => (
+                    <div key={d.rowId} className="flex gap-2 items-center text-sm">
                       <span className="field-input flex-1 bg-background/50 text-foreground/90">{d.name}</span>
                       <span className="w-16 text-right text-muted-foreground tabular-nums">{d.weight}%</span>
                     </div>
@@ -419,8 +442,8 @@ export default function RoundForm() {
                 <span className="text-xs text-muted-foreground">{t("rounds.gradeBandsTitle")}</span>
                 {!selectedRuleVersionId ? null : (
                   <div className="space-y-1.5">
-                    {gradeBands.map((b, i) => (
-                      <div key={i} className="flex gap-3 items-center text-sm text-foreground/85">
+                    {gradeBands.map((b) => (
+                      <div key={b.grade} className="flex gap-3 items-center text-sm text-foreground/85">
                         <span className="w-8 font-bold">{b.grade}</span>
                         <span className="text-muted-foreground tabular-nums">
                           {b.min} – {b.max}
@@ -445,12 +468,12 @@ export default function RoundForm() {
                     {totalWeight}% / 100%
                   </span>
                 </div>
-                {dimensions.map((d, i) => (
-                  <div key={i} className="flex gap-2 items-center">
+                {dimensions.map((d) => (
+                  <div key={d.rowId} className="flex gap-2 items-center">
                     <input
                       className="field-input flex-1"
                       value={d.name}
-                      onChange={(e) => updateDim(i, "name", e.target.value)}
+                      onChange={(e) => updateDim(d.rowId, "name", e.target.value)}
                       placeholder="Dimension name"
                     />
                     <div className="relative w-24">
@@ -460,13 +483,13 @@ export default function RoundForm() {
                         min={0}
                         max={100}
                         value={d.weight}
-                        onChange={(e) => updateDim(i, "weight", e.target.value)}
+                        onChange={(e) => updateDim(d.rowId, "weight", e.target.value)}
                       />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">%</span>
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeDim(i)}
+                      onClick={() => removeDim(d.rowId)}
                       className="text-destructive hover:text-destructive/80 p-1 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -485,8 +508,8 @@ export default function RoundForm() {
 
             <Section title={t("rounds.gradeBandsTitle")}>
               <div className="space-y-2">
-                {gradeBands.map((b, i) => (
-                  <div key={i} className="flex gap-3 items-center">
+                {gradeBands.map((b) => (
+                  <div key={b.grade} className="flex gap-3 items-center">
                     <span className="w-10 text-center font-bold text-foreground/90 text-lg">{b.grade}</span>
                     <input
                       className="field-input w-20 text-center"
@@ -494,7 +517,7 @@ export default function RoundForm() {
                       min={0}
                       max={100}
                       value={b.min}
-                      onChange={(e) => updateBand(i, "min", Number(e.target.value))}
+                      onChange={(e) => updateBand(b.grade, "min", Number(e.target.value))}
                     />
                     <span className="text-muted-foreground">–</span>
                     <input
@@ -503,7 +526,7 @@ export default function RoundForm() {
                       min={0}
                       max={100}
                       value={b.max}
-                      onChange={(e) => updateBand(i, "max", Number(e.target.value))}
+                      onChange={(e) => updateBand(b.grade, "max", Number(e.target.value))}
                     />
                   </div>
                 ))}
@@ -541,12 +564,12 @@ export default function RoundForm() {
                 </div>
               </Field>
               <span className="text-xs text-muted-foreground">{t("rounds.pitchSubScores")}</span>
-              {pitch.subScores.map((s, i) => (
-                <div key={i} className="flex gap-2 items-center">
+              {pitch.subScores.map((s) => (
+                <div key={s.rowKey} className="flex gap-2 items-center">
                   <input
                     className="field-input flex-1"
                     value={s.name}
-                    onChange={(e) => updatePitchSub(i, "name", e.target.value)}
+                    onChange={(e) => updatePitchSub(s.rowKey, "name", e.target.value)}
                   />
                   <div className="relative w-20">
                     <input
@@ -555,7 +578,7 @@ export default function RoundForm() {
                       min={0}
                       max={100}
                       value={s.weight}
-                      onChange={(e) => updatePitchSub(i, "weight", e.target.value)}
+                      onChange={(e) => updatePitchSub(s.rowKey, "weight", e.target.value)}
                     />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">%</span>
                   </div>

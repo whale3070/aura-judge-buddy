@@ -97,7 +97,8 @@ export async function fetchRankings(queryRoundId?: string | null): Promise<Ranki
   const path = withRoundQuery("/api/ranking?prefer_search=1", queryRoundId);
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) return [];
-  return res.json();
+  const data: unknown = await res.json();
+  return Array.isArray(data) ? data : [];
 }
 
 export interface DuelDimWinner {

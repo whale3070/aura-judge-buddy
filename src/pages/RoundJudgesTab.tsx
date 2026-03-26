@@ -8,13 +8,20 @@ import {
   putJudgesPanelAPI,
   type JudgePanelRow,
 } from "@/lib/apiClient";
+import { randomUUIDCompat } from "@/lib/utils";
 import { Users, Loader2, Plus, Trash2, Save, Shuffle, ExternalLink, Copy, AlertCircle } from "lucide-react";
+
+type JudgeRow = JudgePanelRow & { rowKey: string };
+
+function judgesWithRowKeys(judges: JudgePanelRow[]): JudgeRow[] {
+  return judges.map((j) => ({ ...j, rowKey: randomUUIDCompat() }));
+}
 
 export default function RoundJudgesTab({ roundId }: { roundId: string }) {
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [rows, setRows] = useState<JudgePanelRow[]>([]);
+  const [rows, setRows] = useState<JudgeRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [submissionTotal, setSubmissionTotal] = useState(0);
   const [updatedAt, setUpdatedAt] = useState("");
@@ -26,7 +33,9 @@ export default function RoundJudgesTab({ roundId }: { roundId: string }) {
     setErr(null);
     return fetchJudgesPanelAPI(roundId)
       .then((data) => {
-        setRows(data.judges?.length ? [...data.judges] : [{ id: "", name: "" }]);
+        setRows(
+          data.judges?.length ? judgesWithRowKeys(data.judges) : [{ id: "", name: "", rowKey: randomUUIDCompat() }]
+        );
         setCounts(data.counts ?? {});
         setSubmissionTotal(data.submission_total ?? 0);
         setUpdatedAt(data.updated_at ?? "");
@@ -91,8 +100,8 @@ export default function RoundJudgesTab({ roundId }: { roundId: string }) {
     }
   };
 
-  const addRow = () => setRows((prev) => [...prev, { id: "", name: "" }]);
-  const removeRow = (i: number) => setRows((prev) => prev.filter((_, idx) => idx !== i));
+  const addRow = () => setRows((prev) => [...prev, { id: "", name: "", rowKey: randomUUIDCompat() }]);
+  const removeRow = (rowKey: string) => setRows((prev) => prev.filter((r) => r.rowKey !== rowKey));
 
   if (!getAdminWallet()) {
     return (
@@ -145,18 +154,16 @@ export default function RoundJudgesTab({ roundId }: { roundId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, i) => (
-                  <tr key={i} className="border-b border-border/80">
+                {rows.map((row) => (
+                  <tr key={row.rowKey} className="border-b border-border/80">
                     <td className="p-2 align-top">
                       <input
                         className="w-full bg-background border border-border px-2 py-1 font-mono"
                         value={row.id}
                         onChange={(e) =>
-                          setRows((prev) => {
-                            const next = [...prev];
-                            next[i] = { ...next[i], id: e.target.value };
-                            return next;
-                          })
+                          setRows((prev) =>
+                            prev.map((r) => (r.rowKey === row.rowKey ? { ...r, id: e.target.value } : r))
+                          )
                         }
                         placeholder="j1"
                       />
@@ -166,11 +173,9 @@ export default function RoundJudgesTab({ roundId }: { roundId: string }) {
                         className="w-full bg-background border border-border px-2 py-1"
                         value={row.name}
                         onChange={(e) =>
-                          setRows((prev) => {
-                            const next = [...prev];
-                            next[i] = { ...next[i], name: e.target.value };
-                            return next;
-                          })
+                          setRows((prev) =>
+                            prev.map((r) => (r.rowKey === row.rowKey ? { ...r, name: e.target.value } : r))
+                          )
                         }
                         placeholder={t("judges.namePlaceholder")}
                       />
@@ -204,7 +209,7 @@ export default function RoundJudgesTab({ roundId }: { roundId: string }) {
                     <td className="p-2 align-top">
                       <button
                         type="button"
-                        onClick={() => removeRow(i)}
+                        onClick={() => removeRow(row.rowKey)}
                         className="p-1 text-muted-foreground hover:text-destructive"
                         aria-label={t("judges.removeRow")}
                       >

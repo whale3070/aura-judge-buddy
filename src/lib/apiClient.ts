@@ -281,7 +281,9 @@ export function fetchRankingsAPI(queryRoundId?: string | null, track?: string | 
   if (tr) {
     path += (path.includes("?") ? "&" : "?") + `track=${encodeURIComponent(tr)}`;
   }
-  return request<SavedResult[]>(path).catch(() => []);
+  return request<SavedResult[]>(path)
+    .then((rows) => (Array.isArray(rows) ? rows : []))
+    .catch(() => []);
 }
 
 /**
