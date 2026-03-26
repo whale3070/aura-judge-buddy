@@ -179,10 +179,6 @@ This project uses open-source frameworks including Vite, TypeScript, React, shad
 
 **可版本化、多模型AI评审 + 可审计排名系统，专为黑客松与智能体时代开发者工作流设计**
 
-为[**Identity AI黑客松**](https://identityhub.app/contests/ai-hackathon)打造（总奖金2万美元）| 参赛赛道：**智能体基础设施（1万美元）**
-
-核心定位：为TON生态下一代AI应用提供工具与基础组件，包括钱包感知管理流程、可复现评分流水线、开发者API、公平大规模评审协调基础组件。
-
 ### 核心价值
 
 阿乌拉裁决系统是面向黑客松、科创大赛的全流程自动化评审引擎，采用**Golang + 分层多模型AI**架构，实现项目材料自动量化打分、多模型交叉评审、排名与数据存证，解决传统人工评审效率低、主观性强、遗漏优质项目的痛点，让评委专注于核心决策。
