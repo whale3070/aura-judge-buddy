@@ -2,10 +2,6 @@
 
 **Versioned, multi-model AI review + auditable rankings for hackathons and agent-era developer workflows.**
 
-Built for the [**Identity AI Hackathon**](https://identityhub.app/contests/ai-hackathon) (**$20,000 total prize pool**) | Track: **Agent Infrastructure ($10,000)**
-
-Focus: Tooling and primitives for next-gen AI applications on TON — including wallet-aware admin flows, reproducible scoring pipelines, developer-facing APIs, and fair large-scale evaluation coordination primitives.
-
 ---
 
 ## 📌 Overview
